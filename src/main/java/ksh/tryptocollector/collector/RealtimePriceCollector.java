@@ -1,5 +1,6 @@
 package ksh.tryptocollector.collector;
 
+import ksh.tryptocollector.client.websocket.BithumbWebSocketHandler;
 import ksh.tryptocollector.client.websocket.UpbitWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class RealtimePriceCollector {
 
     private final UpbitWebSocketHandler upbitWebSocketHandler;
+    private final BithumbWebSocketHandler bithumbWebSocketHandler;
 
     public void connectUpbit() {
         upbitWebSocketHandler.connect().subscribe();
@@ -18,7 +20,8 @@ public class RealtimePriceCollector {
     }
 
     public void connectBithumb() {
-        log.info("빗썸 WebSocket 연결 — 핸들러 미구현");
+        bithumbWebSocketHandler.connect().subscribe();
+        log.info("빗썸 WebSocket 연결 시작");
     }
 
     public void connectBinance() {
