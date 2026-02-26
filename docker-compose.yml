@@ -1,0 +1,12 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    depends_on:
+      - redis
+    environment:
+      SPRING_DATA_REDIS_HOST: redis

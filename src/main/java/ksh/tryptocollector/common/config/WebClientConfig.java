@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
 
 @Configuration
 public class WebClientConfig {
@@ -22,5 +23,10 @@ public class WebClientConfig {
                 .clientConnector(new ReactorClientHttpConnector())
                 .exchangeStrategies(strategies)
                 .build();
+    }
+
+    @Bean
+    public ReactorNettyWebSocketClient reactorNettyWebSocketClient() {
+        return new ReactorNettyWebSocketClient();
     }
 }
