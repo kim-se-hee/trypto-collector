@@ -1,5 +1,6 @@
 package ksh.tryptocollector.collector;
 
+import ksh.tryptocollector.client.websocket.BinanceWebSocketHandler;
 import ksh.tryptocollector.client.websocket.BithumbWebSocketHandler;
 import ksh.tryptocollector.client.websocket.UpbitWebSocketHandler;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ public class RealtimePriceCollector {
 
     private final UpbitWebSocketHandler upbitWebSocketHandler;
     private final BithumbWebSocketHandler bithumbWebSocketHandler;
+    private final BinanceWebSocketHandler binanceWebSocketHandler;
 
     public void connectUpbit() {
         upbitWebSocketHandler.connect().subscribe();
@@ -25,6 +27,7 @@ public class RealtimePriceCollector {
     }
 
     public void connectBinance() {
-        log.info("바이낸스 WebSocket 연결 — 핸들러 미구현");
+        binanceWebSocketHandler.connect().subscribe();
+        log.info("바이낸스 WebSocket 연결 시작");
     }
 }
