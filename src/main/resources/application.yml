@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: trypto-collector
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+exchange:
+  upbit:
+    rest-url: https://api.upbit.com/v1/market/all
+    ws-url: wss://api.upbit.com/websocket/v1
+  bithumb:
+    rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
+    ws-url: wss://pubwss.bithumb.com/pub/ws
+  binance:
+    rest-url: https://api.binance.com/api/v3/ticker/24hr
+    ws-url: wss://stream.binance.com:9443/ws/!ticker@arr
+
+ticker:
+  redis-ttl-seconds: 30
+  redis-key-prefix: ticker
+
+logging:
+  level:
+    ksh.tryptocollector: DEBUG
+    ksh.tryptocollector.client.websocket: INFO
