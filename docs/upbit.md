@@ -193,8 +193,14 @@ private byte[] decompressIfNeeded(ByteBuffer buffer) {
 @Component
 public class UpbitRestClient {
     private final WebClient webClient;
+    private final String restUrl;
 
-    @Value("${exchange.upbit.rest-url}") String restUrl;
+    public UpbitRestClient(
+            WebClient webClient,
+            @Value("${exchange.upbit.rest-url}") String restUrl) {
+        this.webClient = webClient;
+        this.restUrl = restUrl;
+    }
 
     public Flux<MarketInfo> fetchKrwMarkets() {
         return webClient.get()
@@ -202,12 +208,10 @@ public class UpbitRestClient {
             .retrieve()
             .bodyToFlux(UpbitMarketResponse.class)
             .filter(r -> r.market().startsWith("KRW-"))
-            .map(r -> new MarketInfo(
-                r.market().substring(4),  // base
-                "KRW",                    // quote
-                r.market().substring(4) + "/KRW",  // pair
-                r.koreanName()            // displayName
-            ));
+            .map(r -> {
+                String base = r.market().substring(4);
+                return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
+            });
     }
 }
 ```
@@ -216,11 +220,11 @@ public class UpbitRestClient {
 
 ```java
 public record UpbitTickerMessage(
-    @JsonProperty("code") String code,
+    String code,
     @JsonProperty("trade_price") BigDecimal tradePrice,
     @JsonProperty("signed_change_rate") BigDecimal signedChangeRate,
     @JsonProperty("acc_trade_price_24h") BigDecimal accTradePrice24h,
-    @JsonProperty("timestamp") long timestamp
+    long timestamp
 ) {
     public NormalizedTicker toNormalized(String displayName) {
         String base = code.substring(4);  // "KRW-BTC" → "BTC"

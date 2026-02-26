@@ -194,8 +194,14 @@ Flux.fromArray(messages)
 @Component
 public class BinanceRestClient {
     private final WebClient webClient;
+    private final String restUrl;
 
-    @Value("${exchange.binance.rest-url}") String restUrl;
+    public BinanceRestClient(
+            WebClient webClient,
+            @Value("${exchange.binance.rest-url}") String restUrl) {
+        this.webClient = webClient;
+        this.restUrl = restUrl;
+    }
 
     public Flux<BinanceTickerResponse> fetchUsdtTickers() {
         return webClient.get()

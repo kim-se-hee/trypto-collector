@@ -116,8 +116,14 @@ market: "KRW-BTC"
 @Component
 public class BithumbRestClient {
     private final WebClient webClient;
+    private final String restUrl;
 
-    @Value("${exchange.bithumb.rest-url}") String restUrl;
+    public BithumbRestClient(
+            WebClient webClient,
+            @Value("${exchange.bithumb.rest-url}") String restUrl) {
+        this.webClient = webClient;
+        this.restUrl = restUrl;
+    }
 
     public Flux<MarketInfo> fetchKrwMarkets() {
         return webClient.get()
@@ -125,12 +131,10 @@ public class BithumbRestClient {
             .retrieve()
             .bodyToFlux(BithumbMarketResponse.class)
             .filter(r -> r.market().startsWith("KRW-"))
-            .map(r -> new MarketInfo(
-                r.market().substring(4),
-                "KRW",
-                r.market().substring(4) + "/KRW",
-                r.koreanName()
-            ));
+            .map(r -> {
+                String base = r.market().substring(4);
+                return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
+            });
     }
 }
 ```
@@ -139,11 +143,11 @@ public class BithumbRestClient {
 
 ```java
 public record BithumbTickerMessage(
-    @JsonProperty("code") String code,
+    String code,
     @JsonProperty("trade_price") BigDecimal tradePrice,
     @JsonProperty("signed_change_rate") BigDecimal signedChangeRate,
     @JsonProperty("acc_trade_price_24h") BigDecimal accTradePrice24h,
-    @JsonProperty("timestamp") long timestamp
+    long timestamp
 ) {
     public NormalizedTicker toNormalized(String displayName) {
         String base = code.substring(4);
