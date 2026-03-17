@@ -53,16 +53,16 @@ rm -f "$HOME/.claude/implement-phase.json"
 
 - 같은 패키지의 기존 클래스 구조와 패턴 확인
 - 다른 거래소의 동일 계층 구현이 있으면 참조 (예: Upbit WebSocket 핸들러 참고하여 Bithumb 구현)
-- `common/model/`의 공통 모델 확인 (Exchange enum, NormalizedTicker, TickerEvent)
+- `model/`의 공통 모델 확인 (Exchange enum, NormalizedTicker, TickerEvent, MarketInfo)
 
 ### 의존 관계 확인
 
 구현할 기능이 의존하는 선행 구현이 완료되었는지 확인한다:
 
-- **거래소 WebSocket 핸들러** → `common/model`, `metadata`, `redis`, `rabbitmq` 패키지가 필요
-- **REST 클라이언트** → `common/config` (WebClient Bean)이 필요
-- **Redis 저장소** → `common/model/NormalizedTicker`가 필요
-- **RabbitMQ 발행** → `common/model/TickerEvent`가 필요
+- **거래소 WebSocket 핸들러** → `model`, `metadata`, `redis`, `rabbitmq` 패키지가 필요
+- **REST 클라이언트** → `config` (WebClient Bean)이 필요
+- **Redis 저장소** → `model/NormalizedTicker`가 필요
+- **RabbitMQ 발행** → `model/TickerEvent`가 필요
 
 선행 구현이 없으면 사용자에게 알리고, 선행 구현부터 진행할지 확인한다.
 
@@ -79,20 +79,19 @@ CLAUDE.md의 코딩 컨벤션과 Git 컨벤션을 따라 구현한다.
 해당 기능에 필요한 패키지만, **의존 방향(의존 대상 먼저)**을 따라 구현한다. 아래 의존 그래프를 참고하여 순서를 결정한다:
 
 ```
-common/model  ←─ 모든 패키지가 의존
-common/config ←─ client/rest, client/websocket
-client/rest   ←─ metadata
-metadata      ←─ client/websocket
-redis         ←─ client/websocket
-rabbitmq      ←─ client/websocket
-client/websocket ←─ collector
-collector     ←─ (최상위, 아무도 의존하지 않음)
+model/        ←─ 모든 패키지가 의존
+config/       ←─ exchange/{거래소}
+metadata/     ←─ exchange/{거래소}
+redis/        ←─ exchange/{거래소}
+rabbitmq/     ←─ exchange/{거래소}
+exchange/{거래소}/ ←─ exchange/RealtimePriceCollector
+exchange/RealtimePriceCollector ←─ (최상위, 아무도 의존하지 않음)
 ```
 
 **예시:**
-- 새 거래소 추가 → `client/rest` DTO + 클라이언트 → `client/websocket` DTO + 핸들러 → `metadata` 등록
+- 새 거래소 추가 → `exchange/{거래소}/` REST 클라이언트 + DTO + WebSocket 핸들러 → `metadata` 등록
 - Redis 저장 전략 변경 → `redis` 패키지만
-- 새 출력 싱크 추가 → `common/model`(이벤트 DTO) → 새 패키지 → `client/websocket`에 연결
+- 새 출력 싱크 추가 → `model/`(이벤트 DTO) → 새 패키지 → `exchange/{거래소}`에 연결
 
 ### 커밋 규칙
 

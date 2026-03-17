@@ -29,7 +29,7 @@ model: inherit
 
 ### 1. 대상 코드 분석
 
-- 변경된 파일의 패키지와 역할을 식별한다 (client/rest, client/websocket, redis, rabbitmq, metadata, collector)
+- 변경된 파일의 패키지와 역할을 식별한다 (config, model, exchange/{거래소}, metadata, redis, rabbitmq)
 - 기존 테스트 코드가 있으면 패턴을 확인한다
 - 코드의 리액티브 체인 구조를 파악한다
 
