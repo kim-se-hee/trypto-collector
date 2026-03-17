@@ -13,6 +13,7 @@
 | Redis | `spring-boot-starter-data-redis-reactive` |
 | RabbitMQ | `spring-boot-starter-amqp` |
 | WebFlux | `spring-boot-starter-webflux` |
+| InfluxDB | `influxdb-client-java` |
 | Lombok | `lombok` (compileOnly + annotationProcessor) |
 | 테스트 | `spring-boot-starter-test`, `reactor-test` |
 

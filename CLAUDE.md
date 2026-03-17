@@ -21,6 +21,7 @@
 | 메시지 브로커 | RabbitMQ (Spring AMQP) | |
 | HTTP 클라이언트 | WebClient (Reactor Netty) | |
 | WebSocket 클라이언트 | ReactorNettyWebSocketClient | |
+| 시계열 DB | InfluxDB (`influxdb-client-java`) | |
 | 유틸리티 | Lombok | |
 | 컨테이너 | Docker Compose | |
 
@@ -41,6 +42,7 @@ ksh.tryptocollector/
     bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
     binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
   metadata/               마켓 메타데이터 (MarketInfoCache, ExchangeInitializer)
+  candle/                 캔들 생성 (CandleBuffer, CandleFlushScheduler, CandleSnapshot)
   redis/                  시세 저장 (TickerRedisRepository)
   rabbitmq/               이벤트 발행 (TickerEventPublisher, RabbitMQConfig)
 ```
@@ -154,3 +156,4 @@ GitHub Flow를 따른다. `main` 브랜치와 `feature/*` 브랜치만 사용한
 - 전체 아키텍처: `docs/architecture.md`
 - 공통 인프라: `docs/common-infrastructure.md`
 - 거래소별: `docs/upbit.md`, `docs/bithumb.md`, `docs/binance.md`
+- 캔들 데이터 수집: `docs/candle.md`
