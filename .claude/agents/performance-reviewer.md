@@ -20,10 +20,11 @@ tools:
 
 ## 리뷰 프로세스
 
-1. `git diff --name-only HEAD~1`로 변경 파일 파악
-2. 각 파일의 전체 내용과 diff를 읽고, **데이터가 흐르는 핫 패스(hot path)**를 추적
-3. 체크리스트 검증 — **"이 코드가 초당 수백 건의 시세를 처리하면?"** 이라는 질문을 계속 던짐
-4. 심각도별로 정리하여 한국어로 출력
+1. `CLAUDE.md`를 읽어 프로젝트 구조와 리액티브 패턴 규약을 파악한다
+2. `git diff --name-only main...HEAD`로 변경 파일 파악 (브랜치 전체 변경 대상)
+3. 각 파일의 전체 내용과 diff를 읽고, **데이터가 흐르는 핫 패스(hot path)**를 추적
+4. 체크리스트 검증 — **"이 코드가 초당 수백 건의 시세를 처리하면?"** 이라는 질문을 계속 던짐
+5. 심각도별로 정리하여 한국어로 출력
 
 ### 분석 관점
 
@@ -51,10 +52,10 @@ tools:
 
 ### 3. Redis 접근 패턴 [CRITICAL]
 
-- [ ] **건건이 SET**: 배치로 수신한 시세를 개별 `SET` 명령으로 저장 (Redis Pipeline 또는 `MSET` 검토)
+- [ ] **건건이 SET**: 배치로 수신한 시세를 개별 `SET` 명령으로 저장 (Redis Pipeline 검토. `MSET`은 TTL 미지원이므로 이 프로젝트에 부적합)
   ```
   시나리오: Binance 배치 500건 → SET 500회 = 네트워크 라운드트립 500회
-  개선: Pipeline으로 묶으면 라운드트립 1회
+  개선: Pipeline으로 SET+EXPIRE 쌍을 묶으면 라운드트립 1회
   ```
 - [ ] **불필요한 직렬화 반복**: 같은 `NormalizedTicker`를 Redis 저장용과 RabbitMQ 발행용으로 각각 직렬화 (한 번 직렬화하여 재사용 검토)
 - [ ] **키 패턴 비효율**: Redis 키가 과도하게 길거나 패턴이 SCAN에 불리한 구조
@@ -65,7 +66,7 @@ tools:
 - [ ] **건건이 발행**: 배치로 수신한 시세를 개별 메시지로 발행 (배치 발행 검토)
 - [ ] **과도한 메시지 크기**: `TickerEvent`에 불필요한 필드가 포함되어 메시지 크기가 불필요하게 큼
 - [ ] **Publisher Confirm 대기 블로킹**: Publisher Confirm을 동기적으로 대기하여 발행 처리량 저하
-- [ ] **boundedElastic 과부하**: 모든 시세 발행이 boundedElastic 스레드풀에 몰려 스레드 고갈 위험
+- [ ] **boundedElastic 과부하**: 모든 시세 발행이 boundedElastic 스레드풀에 몰려 스레드 고갈 위험 (스레드 안전성은 concurrency-reviewer가 검증. 여기서는 처리량 관점만 확인)
   ```
   시나리오: Binance 500건 + Upbit/Bithumb 동시 발행 → boundedElastic 스레드 고갈
   확인: Schedulers.DEFAULT_BOUNDED_ELASTIC_SIZE 기본값 (CPU코어 × 10)

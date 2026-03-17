@@ -21,10 +21,11 @@ tools:
 
 ## 리뷰 프로세스
 
-1. `git diff --name-only HEAD~1`로 변경 파일 파악
-2. 각 파일의 전체 내용과 diff를 읽고, **상태 변경이 일어나는 코드 흐름**을 추적
-3. 체크리스트 검증 — **"3개 거래소의 시세가 동시에 들어오면?"** 이라는 질문을 계속 던짐
-4. 심각도별로 정리하여 한국어로 출력
+1. `CLAUDE.md`를 읽어 프로젝트 구조와 리액티브 패턴 규약을 파악한다
+2. `git diff --name-only main...HEAD`로 변경 파일 파악 (브랜치 전체 변경 대상)
+3. 각 파일의 전체 내용과 diff를 읽고, **상태 변경이 일어나는 코드 흐름**을 추적
+4. 체크리스트 검증 — **"3개 거래소의 시세가 동시에 들어오면?"** 이라는 질문을 계속 던짐
+5. 심각도별로 정리하여 한국어로 출력
 
 ### 분석 관점
 
@@ -38,7 +39,7 @@ tools:
 
 Reactor의 이벤트 루프 스레드에서 블로킹 호출은 전체 파이프라인을 멈출 수 있다.
 
-- [ ] **이벤트 루프에서 블로킹 호출**: `reactor-http-nio` 스레드에서 `RabbitTemplate.convertAndSend()`, `ObjectMapper.writeValueAsString()`, `Thread.sleep()`, 동기 I/O 실행
+- [ ] **이벤트 루프에서 블로킹 호출**: `reactor-http-nio` 스레드에서 `RabbitTemplate.convertAndSend()`, `Thread.sleep()`, 동기 I/O 실행 (단, `ObjectMapper` 직렬화는 CPU 바운드이므로 소형 DTO에 한해 이벤트 루프에서 허용)
   ```
   시나리오: Netty 이벤트 루프 스레드 4개 중 하나가 RabbitMQ 발행으로 블로킹 →
   해당 스레드가 담당하는 모든 WebSocket 연결의 시세 수신이 지연
