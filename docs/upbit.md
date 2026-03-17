@@ -249,5 +249,5 @@ public record UpbitTickerMessage(
 3. 수신된 바이너리 프레임을 `decompressIfNeeded()`로 처리
 4. JSON → `UpbitTickerMessage` 역직렬화
 5. `MarketInfoCache`에서 displayName 조회
-6. `toNormalized()` → `TickerRedisRepository.save()`
+6. `toNormalized()` → `TickerRedisRepository.save()` + `TickerEventPublisher.publish()` 병렬 실행
 7. 연결 끊김 시 `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))` 재연결

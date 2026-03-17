@@ -8,14 +8,16 @@
 
 | 패키지 | 클래스 | 유형 |
 |--------|--------|------|
-| `common.config` | `RedisConfig` | `@Configuration` |
 | `common.config` | `WebClientConfig` | `@Configuration` |
 | `common.model` | `Exchange` | enum |
 | `common.model` | `NormalizedTicker` | record |
+| `common.model` | `TickerEvent` | record |
 | `metadata.model` | `MarketInfo` | record |
 | `metadata` | `MarketInfoCache` | `@Component` |
 | `metadata` | `ExchangeInitializer` | `@Component` |
 | `client.websocket` | `ExchangeTickerStream` | interface |
+| `rabbitmq` | `RabbitMQConfig` | `@Configuration` |
+| `rabbitmq` | `TickerEventPublisher` | `@Component` |
 | `redis` | `TickerRedisRepository` | `@Component` |
 | `collector` | `RealtimePriceCollector` | `@Component` |
 | — | `build.gradle` | 빌드 설정 |
@@ -32,6 +34,7 @@
 | 분류 | 의존성 |
 |------|--------|
 | Redis | `spring-boot-starter-data-redis-reactive` |
+| RabbitMQ | `spring-boot-starter-amqp` |
 | WebFlux | `spring-boot-starter-webflux` |
 | Lombok | `lombok` (compileOnly + annotationProcessor) |
 | 테스트 | `spring-boot-starter-test`, `reactor-test` |
@@ -48,6 +51,11 @@ spring:
     redis:
       host: localhost
       port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    publisher-confirm-type: correlated
+    publisher-returns: true
 
 exchange:
   upbit:
@@ -58,7 +66,7 @@ exchange:
     ws-url: wss://pubwss.bithumb.com/pub/ws
   binance:
     rest-url: https://api.binance.com/api/v3/ticker/24hr
-    ws-url: wss://stream.binance.com:9443/ws/!ticker@arr
+    ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr
 
 ticker:
   redis-ttl-seconds: 30
@@ -96,6 +104,21 @@ logging:
 **변동률 기준 차이:**
 - 업비트/빗썸: 전일 종가 대비 (`signed_change_rate`)
 - 바이낸스: 24시간 롤링 윈도우 대비 (`P` / 100)
+
+---
+
+### TickerEvent (record)
+
+RabbitMQ로 발행하는 시세 변경 이벤트 메시지. 트레이딩 서버가 미체결 주문 매칭에 사용한다. 패키지: `common.model`
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `exchange` | `String` | 거래소 명 (UPBIT, BITHUMB, BINANCE) |
+| `symbol` | `String` | 거래 페어 (BTC/KRW, ETH/USDT) |
+| `currentPrice` | `BigDecimal` | 변경된 현재가 |
+| `timestamp` | `long` | 시세 수신 시각 (epoch ms) |
+
+`NormalizedTicker`에서 변환하는 `from(NormalizedTicker)` 팩토리 메서드를 제공한다. `symbol`은 `base + "/" + quote` 형식으로 조합한다.
 
 ---
 
@@ -171,9 +194,34 @@ logging:
 
 ---
 
-### RedisConfig (@Configuration)
+### RabbitMQConfig (@Configuration)
 
-`ReactiveRedisTemplate<String, String>` 빈을 등록한다. `StringRedisSerializer`로 키와 값을 모두 직렬화한다. 패키지: `common.config`
+RabbitMQ 설정. Fanout Exchange 선언과 Publisher Confirms가 설정된 `RabbitTemplate` 빈을 등록한다. 패키지: `rabbitmq`
+
+| 항목 | 값 |
+|------|-----|
+| Exchange 이름 | `ticker.exchange` |
+| Exchange 타입 | Fanout |
+| Publisher Confirms | `correlated` 모드 (nack 시 로그 경고) |
+
+큐 바인딩은 소비자(트레이딩 서버)가 담당한다. 수집기는 Exchange만 선언한다.
+
+---
+
+### TickerEventPublisher (@Component)
+
+`NormalizedTicker`를 `TickerEvent`로 변환하여 RabbitMQ Fanout Exchange에 발행한다. 패키지: `rabbitmq`
+
+**의존성:** `RabbitTemplate`, `ObjectMapper`
+
+| 항목 | 값 |
+|------|-----|
+| Exchange | `ticker.exchange` (Fanout) |
+| Content-Type | `application/json` |
+| 스케줄링 | `Schedulers.boundedElastic()` (블로킹 RabbitTemplate 래핑) |
+| 에러 처리 | 직렬화/발행 실패 시 로그 경고 후 `onErrorComplete()` (시세 수집을 중단하지 않음) |
+
+`publish(NormalizedTicker)` 메서드 하나만 제공한다. `Mono<Void>`를 반환한다.
 
 ---
 

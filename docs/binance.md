@@ -255,7 +255,7 @@ public record BinanceTickerMessage(
 1. `ReactorNettyWebSocketClient`로 WebSocket 연결 (구독 메시지 불필요)
 2. 수신된 텍스트 프레임을 `BinanceTickerMessage[]` 배열로 역직렬화
 3. `MarketInfoCache` 기반 USDT 필터링 (캐시에 없는 심볼 무시)
-4. `toNormalized()` → `TickerRedisRepository.save()` (bounded concurrency 32)
+4. `toNormalized()` → `TickerRedisRepository.save()` + `TickerEventPublisher.publish()` 병렬 실행 (bounded concurrency 32)
 5. 연결 끊김 시 `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))` 재연결
 
 ### 업비트/빗썸과의 차이점

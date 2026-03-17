@@ -174,7 +174,7 @@ public record BithumbTickerMessage(
 3. 수신된 **텍스트 프레임**을 바로 파싱 (gzip 해제 불필요)
 4. JSON → `BithumbTickerMessage` 역직렬화
 5. `MarketInfoCache`에서 displayName 조회
-6. `toNormalized()` → `TickerRedisRepository.save()`
+6. `toNormalized()` → `TickerRedisRepository.save()` + `TickerEventPublisher.publish()` 병렬 실행
 7. 연결 끊김 시 `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))` 재연결
 
 업비트 WebSocketHandler와 거의 동일하며, 바이너리 프레임 처리(gzip 해제) 로직만 없다.
