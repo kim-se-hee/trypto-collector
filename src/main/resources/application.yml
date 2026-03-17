@@ -5,6 +5,11 @@ spring:
     redis:
       host: localhost
       port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    publisher-confirm-type: correlated
+    publisher-returns: true
 
 exchange:
   upbit:

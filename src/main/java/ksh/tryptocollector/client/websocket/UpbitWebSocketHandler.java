@@ -2,7 +2,9 @@ package ksh.tryptocollector.client.websocket;
 
 import ksh.tryptocollector.client.websocket.dto.UpbitTickerMessage;
 import ksh.tryptocollector.common.model.Exchange;
+import ksh.tryptocollector.common.model.NormalizedTicker;
 import ksh.tryptocollector.metadata.MarketInfoCache;
+import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +33,7 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerRedisRepository tickerRedisRepository;
+    private final TickerEventPublisher tickerEventPublisher;
     private final String wsUrl;
 
     public UpbitWebSocketHandler(
@@ -38,11 +41,13 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
             ObjectMapper objectMapper,
             MarketInfoCache marketInfoCache,
             TickerRedisRepository tickerRedisRepository,
+            TickerEventPublisher tickerEventPublisher,
             @Value("${exchange.upbit.ws-url}") String wsUrl) {
         this.webSocketClient = webSocketClient;
         this.objectMapper = objectMapper;
         this.marketInfoCache = marketInfoCache;
         this.tickerRedisRepository = tickerRedisRepository;
+        this.tickerEventPublisher = tickerEventPublisher;
         this.wsUrl = wsUrl;
     }
 
@@ -77,9 +82,13 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
             byte[] decompressed = decompressIfNeeded(payload);
             UpbitTickerMessage ticker = objectMapper.readValue(decompressed, UpbitTickerMessage.class);
             marketInfoCache.find(Exchange.UPBIT, ticker.code())
-                    .ifPresent(meta -> tickerRedisRepository
-                            .save(ticker.toNormalized(meta.displayName()))
-                            .subscribe());
+                    .ifPresent(meta -> {
+                        NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
+                        Mono.when(
+                                tickerRedisRepository.save(normalized),
+                                tickerEventPublisher.publish(normalized)
+                        ).subscribe();
+                    });
         } catch (Exception e) {
             log.debug("업비트 메시지 처리 실패: {}", e.getMessage());
         }

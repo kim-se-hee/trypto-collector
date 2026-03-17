@@ -2,7 +2,9 @@ package ksh.tryptocollector.client.websocket;
 
 import ksh.tryptocollector.client.websocket.dto.BithumbTickerMessage;
 import ksh.tryptocollector.common.model.Exchange;
+import ksh.tryptocollector.common.model.NormalizedTicker;
 import ksh.tryptocollector.metadata.MarketInfoCache;
+import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +27,7 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerRedisRepository tickerRedisRepository;
+    private final TickerEventPublisher tickerEventPublisher;
     private final String wsUrl;
 
     public BithumbWebSocketHandler(
@@ -32,11 +35,13 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
             ObjectMapper objectMapper,
             MarketInfoCache marketInfoCache,
             TickerRedisRepository tickerRedisRepository,
+            TickerEventPublisher tickerEventPublisher,
             @Value("${exchange.bithumb.ws-url}") String wsUrl) {
         this.webSocketClient = webSocketClient;
         this.objectMapper = objectMapper;
         this.marketInfoCache = marketInfoCache;
         this.tickerRedisRepository = tickerRedisRepository;
+        this.tickerEventPublisher = tickerEventPublisher;
         this.wsUrl = wsUrl;
     }
 
@@ -70,9 +75,13 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
             String payload = message.getPayloadAsText();
             BithumbTickerMessage ticker = objectMapper.readValue(payload, BithumbTickerMessage.class);
             marketInfoCache.find(Exchange.BITHUMB, ticker.code())
-                    .ifPresent(meta -> tickerRedisRepository
-                            .save(ticker.toNormalized(meta.displayName()))
-                            .subscribe());
+                    .ifPresent(meta -> {
+                        NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
+                        Mono.when(
+                                tickerRedisRepository.save(normalized),
+                                tickerEventPublisher.publish(normalized)
+                        ).subscribe();
+                    });
         } catch (Exception e) {
             log.debug("빗썸 메시지 처리 실패: {}", e.getMessage());
         }

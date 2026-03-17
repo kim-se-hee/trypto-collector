@@ -2,8 +2,9 @@ package ksh.tryptocollector.client.websocket;
 
 import ksh.tryptocollector.client.websocket.dto.BinanceTickerMessage;
 import ksh.tryptocollector.common.model.Exchange;
+import ksh.tryptocollector.common.model.NormalizedTicker;
 import ksh.tryptocollector.metadata.MarketInfoCache;
-import ksh.tryptocollector.metadata.model.MarketInfo;
+import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerRedisRepository tickerRedisRepository;
+    private final TickerEventPublisher tickerEventPublisher;
     private final String wsUrl;
 
     public BinanceWebSocketHandler(
@@ -35,11 +37,13 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
             ObjectMapper objectMapper,
             MarketInfoCache marketInfoCache,
             TickerRedisRepository tickerRedisRepository,
+            TickerEventPublisher tickerEventPublisher,
             @Value("${exchange.binance.ws-url}") String wsUrl) {
         this.webSocketClient = webSocketClient;
         this.objectMapper = objectMapper;
         this.marketInfoCache = marketInfoCache;
         this.tickerRedisRepository = tickerRedisRepository;
+        this.tickerEventPublisher = tickerEventPublisher;
         this.wsUrl = wsUrl;
     }
 
@@ -64,9 +68,13 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
             return Flux.fromArray(tickers)
                     .flatMap(ticker -> {
                         return marketInfoCache.find(Exchange.BINANCE, ticker.symbol())
-                                .map(meta -> tickerRedisRepository
-                                        .save(ticker.toNormalized(meta.displayName()))
-                                        .then())
+                                .map(meta -> {
+                                    NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
+                                    return Mono.when(
+                                            tickerRedisRepository.save(normalized),
+                                            tickerEventPublisher.publish(normalized)
+                                    );
+                                })
                                 .orElse(Mono.empty());
                     }, BOUNDED_CONCURRENCY);
         } catch (Exception e) {
