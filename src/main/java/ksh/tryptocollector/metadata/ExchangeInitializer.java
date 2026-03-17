@@ -1,13 +1,13 @@
 package ksh.tryptocollector.metadata;
 
 import jakarta.annotation.PostConstruct;
-import ksh.tryptocollector.client.rest.BinanceRestClient;
-import ksh.tryptocollector.client.rest.BithumbRestClient;
-import ksh.tryptocollector.client.rest.UpbitRestClient;
-import ksh.tryptocollector.collector.RealtimePriceCollector;
-import ksh.tryptocollector.common.model.Exchange;
-import ksh.tryptocollector.common.model.NormalizedTicker;
-import ksh.tryptocollector.metadata.model.MarketInfo;
+import ksh.tryptocollector.exchange.RealtimePriceCollector;
+import ksh.tryptocollector.exchange.binance.BinanceRestClient;
+import ksh.tryptocollector.exchange.bithumb.BithumbRestClient;
+import ksh.tryptocollector.exchange.upbit.UpbitRestClient;
+import ksh.tryptocollector.model.Exchange;
+import ksh.tryptocollector.model.MarketInfo;
+import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

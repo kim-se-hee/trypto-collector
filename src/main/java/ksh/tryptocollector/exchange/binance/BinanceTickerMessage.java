@@ -1,8 +1,8 @@
-package ksh.tryptocollector.client.websocket.dto;
+package ksh.tryptocollector.exchange.binance;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import ksh.tryptocollector.common.model.Exchange;
-import ksh.tryptocollector.common.model.NormalizedTicker;
+import ksh.tryptocollector.model.Exchange;
+import ksh.tryptocollector.model.NormalizedTicker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,7 +14,6 @@ public record BinanceTickerMessage(
         @JsonProperty("q") String quoteVolume,
         @JsonProperty("E") long eventTime
 ) {
-
     private static final int CHANGE_RATE_SCALE = 8;
 
     public NormalizedTicker toNormalized(String displayName) {

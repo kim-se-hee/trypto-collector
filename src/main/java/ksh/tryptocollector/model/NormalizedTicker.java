@@ -1,4 +1,4 @@
-package ksh.tryptocollector.common.model;
+package ksh.tryptocollector.model;
 
 import java.math.BigDecimal;
 

@@ -29,4 +29,4 @@ ticker:
 logging:
   level:
     ksh.tryptocollector: DEBUG
-    ksh.tryptocollector.client.websocket: INFO
+    ksh.tryptocollector.exchange: INFO

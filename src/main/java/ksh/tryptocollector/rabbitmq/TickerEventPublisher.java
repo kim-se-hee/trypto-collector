@@ -1,7 +1,7 @@
 package ksh.tryptocollector.rabbitmq;
 
-import ksh.tryptocollector.common.model.NormalizedTicker;
-import ksh.tryptocollector.common.model.TickerEvent;
+import ksh.tryptocollector.model.NormalizedTicker;
+import ksh.tryptocollector.model.TickerEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;

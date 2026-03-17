@@ -1,7 +1,6 @@
-package ksh.tryptocollector.client.rest;
+package ksh.tryptocollector.exchange.bithumb;
 
-import ksh.tryptocollector.client.rest.dto.BithumbMarketResponse;
-import ksh.tryptocollector.metadata.model.MarketInfo;
+import ksh.tryptocollector.model.MarketInfo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -9,7 +8,6 @@ import reactor.core.publisher.Flux;
 
 @Component
 public class BithumbRestClient {
-
     private final WebClient webClient;
     private final String restUrl;
 

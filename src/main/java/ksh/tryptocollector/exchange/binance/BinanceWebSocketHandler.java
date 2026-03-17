@@ -1,9 +1,9 @@
-package ksh.tryptocollector.client.websocket;
+package ksh.tryptocollector.exchange.binance;
 
-import ksh.tryptocollector.client.websocket.dto.BinanceTickerMessage;
-import ksh.tryptocollector.common.model.Exchange;
-import ksh.tryptocollector.common.model.NormalizedTicker;
+import ksh.tryptocollector.exchange.ExchangeTickerStream;
 import ksh.tryptocollector.metadata.MarketInfoCache;
+import ksh.tryptocollector.model.Exchange;
+import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,6 @@ import java.time.Duration;
 @Slf4j
 @Component
 public class BinanceWebSocketHandler implements ExchangeTickerStream {
-
     private static final int BOUNDED_CONCURRENCY = 32;
 
     private final ReactorNettyWebSocketClient webSocketClient;

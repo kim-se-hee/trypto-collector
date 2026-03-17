@@ -2,7 +2,7 @@ package ksh.tryptocollector.redis;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import ksh.tryptocollector.common.model.NormalizedTicker;
+import ksh.tryptocollector.model.NormalizedTicker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;

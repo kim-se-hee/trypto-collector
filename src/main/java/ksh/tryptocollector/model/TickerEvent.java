@@ -1,4 +1,4 @@
-package ksh.tryptocollector.common.model;
+package ksh.tryptocollector.model;
 
 import java.math.BigDecimal;
 
@@ -8,7 +8,6 @@ public record TickerEvent(
         BigDecimal currentPrice,
         long timestamp
 ) {
-
     public static TickerEvent from(NormalizedTicker ticker) {
         return new TickerEvent(
                 ticker.exchange(),

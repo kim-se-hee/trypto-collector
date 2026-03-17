@@ -1,4 +1,4 @@
-package ksh.tryptocollector.client.rest.dto;
+package ksh.tryptocollector.exchange.bithumb;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

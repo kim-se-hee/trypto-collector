@@ -1,6 +1,5 @@
-package ksh.tryptocollector.client.rest;
+package ksh.tryptocollector.exchange.binance;
 
-import ksh.tryptocollector.client.rest.dto.BinanceTickerResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -8,7 +7,6 @@ import reactor.core.publisher.Flux;
 
 @Component
 public class BinanceRestClient {
-
     private final WebClient webClient;
     private final String restUrl;
 

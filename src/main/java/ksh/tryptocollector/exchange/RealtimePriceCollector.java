@@ -1,8 +1,8 @@
-package ksh.tryptocollector.collector;
+package ksh.tryptocollector.exchange;
 
-import ksh.tryptocollector.client.websocket.BinanceWebSocketHandler;
-import ksh.tryptocollector.client.websocket.BithumbWebSocketHandler;
-import ksh.tryptocollector.client.websocket.UpbitWebSocketHandler;
+import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
+import ksh.tryptocollector.exchange.bithumb.BithumbWebSocketHandler;
+import ksh.tryptocollector.exchange.upbit.UpbitWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class RealtimePriceCollector {
-
     private final UpbitWebSocketHandler upbitWebSocketHandler;
     private final BithumbWebSocketHandler bithumbWebSocketHandler;
     private final BinanceWebSocketHandler binanceWebSocketHandler;

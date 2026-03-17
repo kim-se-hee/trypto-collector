@@ -1,4 +1,4 @@
-package ksh.tryptocollector.client.rest.dto;
+package ksh.tryptocollector.exchange.upbit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

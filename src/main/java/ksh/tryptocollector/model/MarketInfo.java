@@ -1,4 +1,4 @@
-package ksh.tryptocollector.metadata.model;
+package ksh.tryptocollector.model;
 
 public record MarketInfo(
         String base,
