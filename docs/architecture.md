@@ -92,44 +92,7 @@ src/main/java/ksh/tryptocollector/
 
 ## 설정 전략
 
-`application.yml`에 모든 외부 설정을 관리하고, `@Value`로 주입한다.
-
-```yaml
-spring:
-  application:
-    name: trypto-collector
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  rabbitmq:
-    host: localhost
-    port: 5672
-    publisher-confirm-type: correlated
-    publisher-returns: true
-
-exchange:
-  upbit:
-    rest-url: https://api.upbit.com/v1/market/all
-    ws-url: wss://api.upbit.com/websocket/v1
-  bithumb:
-    rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
-    ws-url: wss://pubwss.bithumb.com/pub/ws
-  binance:
-    rest-url: https://api.binance.com/api/v3/ticker/24hr
-    ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr
-
-ticker:
-  redis-ttl-seconds: 30
-  redis-key-prefix: ticker
-
-logging:
-  level:
-    ksh.tryptocollector: DEBUG
-    ksh.tryptocollector.exchange: INFO
-```
-
-세 거래소 모두 공개 API를 사용하므로 API 키가 필요 없다.
+`application.yml`에 모든 외부 설정을 관리하고, `@Value`로 주입한다. 세 거래소 모두 공개 API를 사용하므로 API 키가 필요 없다.
 
 ## 설계 결정
 

@@ -4,29 +4,6 @@
 
 ---
 
-## 구현 항목 목록
-
-| 패키지 | 클래스 | 유형 |
-|--------|--------|------|
-| `config` | `WebClientConfig` | `@Configuration` |
-| `model` | `Exchange` | enum |
-| `model` | `NormalizedTicker` | record |
-| `model` | `TickerEvent` | record |
-| `model` | `MarketInfo` | record |
-| `metadata` | `MarketInfoCache` | `@Component` |
-| `metadata` | `ExchangeInitializer` | `@Component` |
-| `exchange` | `ExchangeTickerStream` | interface |
-| `exchange` | `RealtimePriceCollector` | `@Component` |
-| `rabbitmq` | `RabbitMQConfig` | `@Configuration` |
-| `rabbitmq` | `TickerEventPublisher` | `@Component` |
-| `redis` | `TickerRedisRepository` | `@Component` |
-| — | `build.gradle` | 빌드 설정 |
-| — | `application.yml` | 설정 파일 |
-
-> `UpbitMarketResponse`와 `BithumbMarketResponse`는 업비트/빗썸 REST 응답 구조가 동일하지만, 각 거래소 REST 클라이언트가 자신의 DTO를 사용하도록 별도 record로 분리한다.
-
----
-
 ## 상세 명세
 
 ### 의존성
@@ -38,45 +15,6 @@
 | WebFlux | `spring-boot-starter-webflux` |
 | Lombok | `lombok` (compileOnly + annotationProcessor) |
 | 테스트 | `spring-boot-starter-test`, `reactor-test` |
-
----
-
-### application.yml
-
-```yaml
-spring:
-  application:
-    name: trypto-collector
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  rabbitmq:
-    host: localhost
-    port: 5672
-    publisher-confirm-type: correlated
-    publisher-returns: true
-
-exchange:
-  upbit:
-    rest-url: https://api.upbit.com/v1/market/all
-    ws-url: wss://api.upbit.com/websocket/v1
-  bithumb:
-    rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
-    ws-url: wss://pubwss.bithumb.com/pub/ws
-  binance:
-    rest-url: https://api.binance.com/api/v3/ticker/24hr
-    ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr
-
-ticker:
-  redis-ttl-seconds: 30
-  redis-key-prefix: ticker
-
-logging:
-  level:
-    ksh.tryptocollector: DEBUG
-    ksh.tryptocollector.exchange: INFO
-```
 
 ---
 
@@ -101,9 +39,7 @@ logging:
 | `quoteTurnover` | `BigDecimal` | 24시간 거래대금 (quote 통화 기준) | |
 | `tsMs` | `long` | 수집기 수신 시각 (epoch millis) | |
 
-**변동률 기준 차이:**
-- 업비트/빗썸: 전일 종가 대비 (`signed_change_rate`)
-- 바이낸스: 24시간 롤링 윈도우 대비 (`P` / 100)
+변동률 기준 차이는 `architecture.md`의 설계 결정 섹션을 참조한다.
 
 ---
 
@@ -245,14 +181,3 @@ RabbitMQ 설정. Fanout Exchange 선언과 Publisher Confirms가 설정된 `Rabb
 
 `ExchangeInitializer`가 메타데이터 로딩 완료 후 해당 메서드를 호출한다.
 
----
-
-## 거래소별 구현 항목
-
-각 거래소의 코드는 `exchange/{거래소}/` 패키지에 응집되어 있다. 새 거래소를 추가할 때는 해당 패키지만 생성하면 된다.
-
-| 패키지 | 구현 클래스 |
-|--------|------------|
-| `exchange.upbit` | `UpbitRestClient`, `UpbitMarketResponse`, `UpbitTickerMessage`, `UpbitWebSocketHandler` |
-| `exchange.bithumb` | `BithumbRestClient`, `BithumbMarketResponse`, `BithumbTickerMessage`, `BithumbWebSocketHandler` |
-| `exchange.binance` | `BinanceRestClient`, `BinanceTickerResponse`, `BinanceTickerMessage`, `BinanceWebSocketHandler` |

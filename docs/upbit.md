@@ -154,25 +154,3 @@ market: "KRW-BTC"
 | `acc_trade_price_24h` | `quoteTurnover` |
 | `timestamp` | 무시, `System.currentTimeMillis()`로 `tsMs` 설정 |
 
----
-
-## 구현 클래스 목록
-
-| 클래스 | 패키지 | 역할 |
-|--------|--------|------|
-| `UpbitRestClient` | `exchange.upbit` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
-| `UpbitMarketResponse` | `exchange.upbit` | REST 응답 역직렬화 record |
-| `UpbitTickerMessage` | `exchange.upbit` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
-| `UpbitWebSocketHandler` | `exchange.upbit` | `ExchangeTickerStream` 구현, 바이너리 프레임 처리, gzip 해제, 구독/재연결 |
-
-### UpbitWebSocketHandler
-
-핵심 로직:
-
-1. `ReactorNettyWebSocketClient`로 WebSocket 연결
-2. 연결 직후 구독 메시지(JSON 배열) 전송
-3. 수신된 바이너리 프레임을 `decompressIfNeeded()`로 처리
-4. JSON → `UpbitTickerMessage` 역직렬화
-5. `MarketInfoCache`에서 displayName 조회
-6. `toNormalized()` → `TickerRedisRepository.save()` + `TickerEventPublisher.publish()` 병렬 실행
-7. 연결 끊김 시 `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))` 재연결

@@ -89,27 +89,3 @@ market: "KRW-BTC"
 
 핵심 차이는 **프레임 유형**뿐이다. 빗썸은 텍스트 프레임이므로 gzip 압축 해제가 필요 없다.
 
----
-
-## 구현 클래스 목록
-
-| 클래스 | 패키지 | 역할 |
-|--------|--------|------|
-| `BithumbRestClient` | `exchange.bithumb` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
-| `BithumbMarketResponse` | `exchange.bithumb` | REST 응답 역직렬화 record |
-| `BithumbTickerMessage` | `exchange.bithumb` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
-| `BithumbWebSocketHandler` | `exchange.bithumb` | `ExchangeTickerStream` 구현, 텍스트 프레임 처리, 구독/재연결 |
-
-### BithumbWebSocketHandler
-
-핵심 로직:
-
-1. `ReactorNettyWebSocketClient`로 WebSocket 연결
-2. 연결 직후 구독 메시지(JSON 배열) 전송 — 업비트와 동일 형식
-3. 수신된 **텍스트 프레임**을 바로 파싱 (gzip 해제 불필요)
-4. JSON → `BithumbTickerMessage` 역직렬화
-5. `MarketInfoCache`에서 displayName 조회
-6. `toNormalized()` → `TickerRedisRepository.save()` + `TickerEventPublisher.publish()` 병렬 실행
-7. 연결 끊김 시 `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))` 재연결
-
-업비트 WebSocketHandler와 거의 동일하며, 바이너리 프레임 처리(gzip 해제) 로직만 없다.
