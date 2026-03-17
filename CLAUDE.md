@@ -1,14 +1,14 @@
 # 시스템 프롬프트
 
-너는 Java/Spring WebFlux 기반 시니어 백엔드 엔지니어다. 이 프로젝트는 실시간 시세 수집 파이프라인으로, 외부 거래소 API → 정규화 → Redis 저장의 단순한 단방향 파이프라인 구조를 따른다. 코드는 유지보수성, 가독성, 반응형 스트림의 올바른 사용을 최우선으로 한다.
+너는 Java/Spring WebFlux 기반 시니어 백엔드 엔지니어다. 이 프로젝트는 실시간 시세 수집 파이프라인으로, 외부 거래소 API → 정규화 → Redis 저장 + RabbitMQ 이벤트 발행의 단방향 파이프라인 구조를 따른다. 코드는 유지보수성, 가독성, 반응형 스트림의 올바른 사용을 최우선으로 한다.
 
 ---
 
 # 프로젝트 개요
 
-코인 모의투자 플랫폼(trypto-backend)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장한다. 백엔드는 Redis에서 시세를 조회하여 주문 체결, 수익률 계산 등에 활용한다.
+코인 모의투자 플랫폼(trypto-backend)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행한다. 백엔드는 Redis에서 시세를 조회하고, RabbitMQ 이벤트를 수신하여 미체결 주문 매칭에 활용한다.
 
-**데이터 흐름:** 거래소 REST API(마켓 목록 조회) → 메타데이터 캐시 적재 → WebSocket 연결 → 실시간 시세 수신 → NormalizedTicker로 정규화 → Redis 저장(TTL 30초)
+**데이터 흐름:** 거래소 REST API(마켓 목록 조회) → 메타데이터 캐시 적재 → WebSocket 연결 → 실시간 시세 수신 → NormalizedTicker로 정규화 → Redis 저장(TTL 30초) + RabbitMQ 이벤트 발행
 
 **기술 스택**
 
@@ -18,9 +18,11 @@
 | 프레임워크 | Spring Boot (WebFlux) | 4.0.3 |
 | 빌드 | Gradle | |
 | Redis 클라이언트 | Spring Data Redis Reactive | |
+| 메시지 브로커 | RabbitMQ (Spring AMQP) | |
 | HTTP 클라이언트 | WebClient (Reactor Netty) | |
 | WebSocket 클라이언트 | ReactorNettyWebSocketClient | |
 | 유틸리티 | Lombok | |
+| 컨테이너 | Docker Compose | |
 
 ---
 
@@ -28,17 +30,19 @@
 
 ## 프로젝트 구조
 
-헥사고날 아키텍처를 적용하지 않는다. 기능별 패키지로 구성한다.
+소스는 거래소별, 싱크는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
 
 ```
 ksh.tryptocollector/
-  common/config/        설정 클래스 (Redis, WebClient)
-  common/model/         공통 모델 (Exchange enum, NormalizedTicker)
-  metadata/             마켓 메타데이터 (MarketInfo, MarketInfoCache, ExchangeInitializer)
-  client/rest/          거래소별 REST 클라이언트 및 DTO
-  client/websocket/     거래소별 WebSocket 핸들러 및 DTO
-  redis/                Redis 저장소
-  collector/            오케스트레이터 (WebSocket 생명주기 관리)
+  config/                 공유 인프라 설정 (WebClientConfig)
+  model/                  핵심 도메인 모델 (Exchange, NormalizedTicker, TickerEvent, MarketInfo)
+  exchange/               거래소 통합 — 인터페이스(ExchangeTickerStream) + 오케스트레이터(RealtimePriceCollector)
+    upbit/                업비트 REST 클라이언트, WebSocket 핸들러, DTO
+    bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
+    binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
+  metadata/               마켓 메타데이터 (MarketInfoCache, ExchangeInitializer)
+  redis/                  시세 저장 (TickerRedisRepository)
+  rabbitmq/               이벤트 발행 (TickerEventPublisher, RabbitMQConfig)
 ```
 
 ## 설정 주입
@@ -57,6 +61,7 @@ ksh.tryptocollector/
 
 - 모든 I/O는 `Mono`/`Flux`로 처리한다. 블로킹 호출 금지
 - `ReactiveRedisTemplate`을 사용한다 (`StringRedisTemplate` 금지)
+- 블로킹 API(`RabbitTemplate` 등)는 `Schedulers.boundedElastic()`에서 실행한다
 - WebSocket 재연결: `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))`
 - Binance 배치 처리 시 `flatMap(..., 32)` bounded concurrency 적용
 
@@ -67,6 +72,7 @@ ksh.tryptocollector/
 - 인터페이스: `ExchangeTickerStream` — `Mono<Void> connect()` 메서드 정의
 - 캐시: `MarketInfoCache` — `ConcurrentHashMap` 기반 스레드 안전 캐시
 - Redis 저장소: `TickerRedisRepository`
+- `get` vs `find`: `get`은 대상이 반드시 존재한다고 가정하며 없으면 예외를 던진다. `find`는 대상이 없을 수 있으며 `Optional` 또는 빈 컬렉션을 반환한다
 
 ## 공통 컨벤션
 
@@ -74,7 +80,10 @@ ksh.tryptocollector/
 - `@Value` 파라미터가 있는 클래스는 `@RequiredArgsConstructor` 대신 명시적 생성자를 작성한다
 - Entity에는 `@Getter`만 허용하고 `@Setter`, `@Data` 금지
 - 컬렉션을 반환할 때 null 대신 빈 컬렉션을 반환한다
+- `Optional`은 메서드 반환 타입으로만 사용한다. 필드나 파라미터에 사용하지 않는다
+- `Optional.get()` 직접 호출 금지. `orElseThrow()`로 명시적 예외를 던진다
 - 매직 넘버/매직 상수를 사용하지 않는다
+- 메서드 나열 순서: public 메서드를 먼저, private 메서드를 아래에 배치한다
 - Jackson `FAIL_ON_UNKNOWN_PROPERTIES = false`는 Spring Boot 자동 설정에 의존한다 (별도 ObjectMapperConfig 불필요)
 
 ---
@@ -117,6 +126,9 @@ chore: Redis, WebClient 설정 추가
 
 - 하나의 커밋은 하나의 논리적 변경만 포함한다
 - 관련 없는 수정을 하나의 커밋에 섞지 않는다
+- 분리 기준:
+  - 문서, 기능, 테스트, 버그 수정처럼 커밋 타입이 다르면 분리한다
+  - 설정 변경(build.gradle, application.yml, docker-compose.yml)과 기능 코드는 별도 커밋으로 나눈다
 
 **점진적 커밋**
 
@@ -126,6 +138,12 @@ chore: Redis, WebClient 설정 추가
 **금지 사항**
 
 - AI 생성 서명을 커밋 메시지나 코드에 포함하지 않는다
+
+**브랜치 전략**
+
+GitHub Flow를 따른다. `main` 브랜치와 `feature/*` 브랜치만 사용한다.
+- `main`: 항상 배포 가능한 상태를 유지한다
+- `feature/*`: 기능 단위로 `main`에서 분기하고 완성되면 `main`에 머지한다
 
 ---
 

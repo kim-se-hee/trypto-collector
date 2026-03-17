@@ -1,14 +1,14 @@
-package ksh.tryptocollector.common.config;
+package ksh.tryptocollector.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
 
 @Configuration
 public class WebClientConfig {
-
     private static final int MAX_IN_MEMORY_SIZE = 5 * 1024 * 1024;
 
     @Bean
@@ -22,5 +22,10 @@ public class WebClientConfig {
                 .clientConnector(new ReactorClientHttpConnector())
                 .exchangeStrategies(strategies)
                 .build();
+    }
+
+    @Bean
+    public ReactorNettyWebSocketClient reactorNettyWebSocketClient() {
+        return new ReactorNettyWebSocketClient();
     }
 }

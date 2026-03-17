@@ -4,27 +4,6 @@
 
 ---
 
-## 구현 항목 목록
-
-| 패키지 | 클래스 | 유형 |
-|--------|--------|------|
-| `common.config` | `RedisConfig` | `@Configuration` |
-| `common.config` | `WebClientConfig` | `@Configuration` |
-| `common.model` | `Exchange` | enum |
-| `common.model` | `NormalizedTicker` | record |
-| `metadata.model` | `MarketInfo` | record |
-| `metadata` | `MarketInfoCache` | `@Component` |
-| `metadata` | `ExchangeInitializer` | `@Component` |
-| `client.websocket` | `ExchangeTickerStream` | interface |
-| `redis` | `TickerRedisRepository` | `@Component` |
-| `collector` | `RealtimePriceCollector` | `@Component` |
-| — | `build.gradle` | 빌드 설정 |
-| — | `application.yml` | 설정 파일 |
-
-> `UpbitMarketResponse`와 `BithumbMarketResponse`는 업비트/빗썸 REST 응답 구조가 동일하지만, 각 거래소 REST 클라이언트가 자신의 DTO를 사용하도록 별도 record로 분리한다.
-
----
-
 ## 상세 명세
 
 ### 의존성
@@ -32,43 +11,10 @@
 | 분류 | 의존성 |
 |------|--------|
 | Redis | `spring-boot-starter-data-redis-reactive` |
+| RabbitMQ | `spring-boot-starter-amqp` |
 | WebFlux | `spring-boot-starter-webflux` |
 | Lombok | `lombok` (compileOnly + annotationProcessor) |
 | 테스트 | `spring-boot-starter-test`, `reactor-test` |
-
----
-
-### application.yml
-
-```yaml
-spring:
-  application:
-    name: trypto-collector
-  data:
-    redis:
-      host: localhost
-      port: 6379
-
-exchange:
-  upbit:
-    rest-url: https://api.upbit.com/v1/market/all
-    ws-url: wss://api.upbit.com/websocket/v1
-  bithumb:
-    rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
-    ws-url: wss://pubwss.bithumb.com/pub/ws
-  binance:
-    rest-url: https://api.binance.com/api/v3/ticker/24hr
-    ws-url: wss://stream.binance.com:9443/ws/!ticker@arr
-
-ticker:
-  redis-ttl-seconds: 30
-  redis-key-prefix: ticker
-
-logging:
-  level:
-    ksh.tryptocollector: DEBUG
-    ksh.tryptocollector.client.websocket: INFO
-```
 
 ---
 
@@ -80,7 +26,7 @@ logging:
 
 ### NormalizedTicker (record)
 
-세 거래소의 시세를 통일된 구조로 표현한다. 패키지: `common.model`
+세 거래소의 시세를 통일된 구조로 표현한다. 패키지: `model`
 
 | 필드 | 타입 | 설명 | 예시 |
 |------|------|------|------|
@@ -93,15 +39,28 @@ logging:
 | `quoteTurnover` | `BigDecimal` | 24시간 거래대금 (quote 통화 기준) | |
 | `tsMs` | `long` | 수집기 수신 시각 (epoch millis) | |
 
-**변동률 기준 차이:**
-- 업비트/빗썸: 전일 종가 대비 (`signed_change_rate`)
-- 바이낸스: 24시간 롤링 윈도우 대비 (`P` / 100)
+변동률 기준 차이는 `architecture.md`의 설계 결정 섹션을 참조한다.
+
+---
+
+### TickerEvent (record)
+
+RabbitMQ로 발행하는 시세 변경 이벤트 메시지. 트레이딩 서버가 미체결 주문 매칭에 사용한다. 패키지: `model`
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `exchange` | `String` | 거래소 명 (UPBIT, BITHUMB, BINANCE) |
+| `symbol` | `String` | 거래 페어 (BTC/KRW, ETH/USDT) |
+| `currentPrice` | `BigDecimal` | 변경된 현재가 |
+| `timestamp` | `long` | 시세 수신 시각 (epoch ms) |
+
+`NormalizedTicker`에서 변환하는 `from(NormalizedTicker)` 팩토리 메서드를 제공한다. `symbol`은 `base + "/" + quote` 형식으로 조합한다.
 
 ---
 
 ### MarketInfo (record)
 
-거래소별 마켓 메타데이터를 저장한다. 패키지: `metadata.model`
+거래소별 마켓 메타데이터를 저장한다. 패키지: `model`
 
 | 필드 | 타입 | 설명 | 예시 |
 |------|------|------|------|
@@ -149,7 +108,7 @@ logging:
 
 ### ExchangeTickerStream (interface)
 
-모든 거래소 WebSocket 핸들러가 구현하는 인터페이스. `Mono<Void> connect()` 메서드 하나만 정의한다. 패키지: `client.websocket`
+모든 거래소 WebSocket 핸들러가 구현하는 인터페이스. `Mono<Void> connect()` 메서드 하나만 정의한다. 패키지: `exchange`
 
 ---
 
@@ -171,21 +130,46 @@ logging:
 
 ---
 
-### RedisConfig (@Configuration)
+### RabbitMQConfig (@Configuration)
 
-`ReactiveRedisTemplate<String, String>` 빈을 등록한다. `StringRedisSerializer`로 키와 값을 모두 직렬화한다. 패키지: `common.config`
+RabbitMQ 설정. Fanout Exchange 선언과 Publisher Confirms가 설정된 `RabbitTemplate` 빈을 등록한다. 패키지: `rabbitmq`
+
+| 항목 | 값 |
+|------|-----|
+| Exchange 이름 | `ticker.exchange` |
+| Exchange 타입 | Fanout |
+| Publisher Confirms | `correlated` 모드 (nack 시 로그 경고) |
+
+큐 바인딩은 소비자(트레이딩 서버)가 담당한다. 수집기는 Exchange만 선언한다.
+
+---
+
+### TickerEventPublisher (@Component)
+
+`NormalizedTicker`를 `TickerEvent`로 변환하여 RabbitMQ Fanout Exchange에 발행한다. 패키지: `rabbitmq`
+
+**의존성:** `RabbitTemplate`, `ObjectMapper`
+
+| 항목 | 값 |
+|------|-----|
+| Exchange | `ticker.exchange` (Fanout) |
+| Content-Type | `application/json` |
+| 스케줄링 | `Schedulers.boundedElastic()` (블로킹 RabbitTemplate 래핑) |
+| 에러 처리 | 직렬화/발행 실패 시 로그 경고 후 `onErrorComplete()` (시세 수집을 중단하지 않음) |
+
+`publish(NormalizedTicker)` 메서드 하나만 제공한다. `Mono<Void>`를 반환한다.
 
 ---
 
 ### WebClientConfig (@Configuration)
 
-`WebClient` 빈을 등록한다. 바이낸스 REST API(`/api/v3/ticker/24hr`)는 2000+ 심볼을 반환하므로 `maxInMemorySize`를 5MB로 설정한다 (기본 256KB로는 부족). 패키지: `common.config`
+`WebClient` 빈을 등록한다. 바이낸스 REST API(`/api/v3/ticker/24hr`)는 2000+ 심볼을 반환하므로 `maxInMemorySize`를 5MB로 설정한다 (기본 256KB로는 부족). 패키지: `config`
 
 ---
 
 ### RealtimePriceCollector (@Component)
 
-거래소별 WebSocket 연결을 트리거하는 오케스트레이터. 패키지: `collector`
+거래소별 WebSocket 연결을 트리거하는 오케스트레이터. 패키지: `exchange`
 
 **의존성:** `UpbitWebSocketHandler`, `BithumbWebSocketHandler`, `BinanceWebSocketHandler`
 
@@ -195,18 +179,5 @@ logging:
 | `connectBithumb()` | `bithumbWebSocketHandler.connect().subscribe()` |
 | `connectBinance()` | `binanceWebSocketHandler.connect().subscribe()` |
 
-`ExchangeInitializer`가 메타데이터 로딩 완료 후 해당 메서드를 호출한다. 공통 브랜치에서는 뼈대만 구현하고, 거래소별 WebSocketHandler 의존성은 각 거래소 브랜치에서 주입한다.
+`ExchangeInitializer`가 메타데이터 로딩 완료 후 해당 메서드를 호출한다.
 
----
-
-## 거래소 브랜치에서 구현할 항목
-
-공통 브랜치 완료 후, 각 거래소 브랜치에서는 다음만 구현한다:
-
-| 브랜치 | 구현 클래스 |
-|--------|------------|
-| `feature/collector-upbit` | `UpbitRestClient`, `UpbitTickerMessage`, `UpbitWebSocketHandler` |
-| `feature/collector-bithumb` | `BithumbRestClient`, `BithumbTickerMessage`, `BithumbWebSocketHandler` |
-| `feature/collector-binance` | `BinanceRestClient`, `BinanceTickerResponse`, `BinanceTickerMessage`, `BinanceWebSocketHandler` |
-
-거래소 브랜치 간 파일 충돌이 없도록 설계되어 있다.

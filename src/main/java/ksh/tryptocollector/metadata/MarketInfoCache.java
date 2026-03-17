@@ -1,7 +1,7 @@
 package ksh.tryptocollector.metadata;
 
-import ksh.tryptocollector.common.model.Exchange;
-import ksh.tryptocollector.metadata.model.MarketInfo;
+import ksh.tryptocollector.model.Exchange;
+import ksh.tryptocollector.model.MarketInfo;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
