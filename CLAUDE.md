@@ -35,16 +35,16 @@
 
 ```
 ksh.tryptocollector/
-  config/                 공유 인프라 설정 (WebClientConfig)
-  model/                  핵심 도메인 모델 (Exchange, NormalizedTicker, TickerEvent, MarketInfo)
-  exchange/               거래소 통합 — 인터페이스(ExchangeTickerStream) + 오케스트레이터(RealtimePriceCollector)
+  config/                 공유 인프라 설정
+  model/                  핵심 도메인 모델 (enum, record)
+  exchange/               거래소 통합 인터페이스 + 오케스트레이터
     upbit/                업비트 REST 클라이언트, WebSocket 핸들러, DTO
     bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
     binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
-  metadata/               마켓 메타데이터 (MarketInfoCache, ExchangeInitializer)
-  candle/                 캔들 생성 (CandleBuffer, CandleFlushScheduler, CandleSnapshot)
-  redis/                  시세 저장 (TickerRedisRepository)
-  rabbitmq/               이벤트 발행 (TickerEventPublisher, RabbitMQConfig)
+  metadata/               마켓 메타데이터 캐시 + 초기화
+  candle/                 인메모리 분봉 생성 + InfluxDB 저장
+  redis/                  시세 Redis 저장
+  rabbitmq/               시세 이벤트 RabbitMQ 발행
 ```
 
 ## 설정 주입
