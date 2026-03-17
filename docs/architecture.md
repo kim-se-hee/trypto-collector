@@ -4,7 +4,7 @@
 
 trypto-collector는 업비트, 빗썸, 바이낸스 세 거래소의 실시간 시세를 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하는 Spring WebFlux 기반 수집기다. 백엔드(trypto-backend)는 Redis에서 시세를 조회하여 수익률 계산 등에 활용하고, RabbitMQ 이벤트를 수신하여 미체결 주문 매칭에 활용한다.
 
-헥사고날 아키텍처를 적용하지 않는다. 외부 API → 정규화 → Redis 저장의 단순한 단방향 파이프라인이므로, 기능별 패키지로 충분하다.
+헥사고날 아키텍처를 적용하지 않는다. 외부 API → 정규화 → Redis 저장의 단순한 단방향 파이프라인이므로, 소스(거래소)별 + 싱크(기술)별 패키지로 충분하다.
 
 ## 데이터 흐름
 
@@ -42,43 +42,39 @@ trypto-backend (Redis에서 시세 조회)
 ```
 src/main/java/ksh/tryptocollector/
 ├── TryptoCollectorApplication.java
-├── common/
-│   ├── config/
-│   │   └── WebClientConfig.java              WebClient 설정 (maxInMemorySize 5MB)
-│   └── model/
-│       ├── Exchange.java                     enum: UPBIT, BITHUMB, BINANCE
-│       ├── NormalizedTicker.java             정규화된 시세 record
-│       └── TickerEvent.java                  RabbitMQ 시세 변경 이벤트 record
-├── metadata/
-│   ├── model/
-│   │   └── MarketInfo.java                마켓 메타데이터 record
-│   ├── MarketInfoCache.java               ConcurrentHashMap 기반 인메모리 캐시
-│   └── ExchangeInitializer.java           @PostConstruct 초기화, 메타데이터 로딩 오케스트레이터
-├── client/
-│   ├── rest/
-│   │   ├── dto/
-│   │   │   ├── UpbitMarketResponse.java      업비트 REST 응답 DTO
-│   │   │   ├── BithumbMarketResponse.java    빗썸 REST 응답 DTO
-│   │   │   └── BinanceTickerResponse.java    바이낸스 REST 응답 DTO
+├── config/
+│   └── WebClientConfig.java                  WebClient 설정 (maxInMemorySize 5MB)
+├── model/
+│   ├── Exchange.java                         enum: UPBIT, BITHUMB, BINANCE
+│   ├── NormalizedTicker.java                 정규화된 시세 record
+│   ├── TickerEvent.java                      RabbitMQ 시세 변경 이벤트 record
+│   └── MarketInfo.java                       마켓 메타데이터 record
+├── exchange/
+│   ├── ExchangeTickerStream.java             인터페이스: Mono<Void> connect()
+│   ├── RealtimePriceCollector.java           WebSocket 연결 오케스트레이터
+│   ├── upbit/
 │   │   ├── UpbitRestClient.java              업비트 마켓 목록 조회
+│   │   ├── UpbitWebSocketHandler.java        업비트 WebSocket 핸들러
+│   │   ├── UpbitMarketResponse.java          업비트 REST 응답 DTO
+│   │   └── UpbitTickerMessage.java           업비트 WebSocket 메시지 DTO
+│   ├── bithumb/
 │   │   ├── BithumbRestClient.java            빗썸 마켓 목록 조회
-│   │   └── BinanceRestClient.java            바이낸스 24hr 티커 조회
-│   └── websocket/
-│       ├── dto/
-│       │   ├── UpbitTickerMessage.java        업비트 WebSocket 메시지 DTO
-│       │   ├── BithumbTickerMessage.java      빗썸 WebSocket 메시지 DTO
-│       │   └── BinanceTickerMessage.java      바이낸스 WebSocket 메시지 DTO
-│       ├── ExchangeTickerStream.java      인터페이스: Mono<Void> connect()
-│       ├── UpbitWebSocketHandler.java         업비트 WebSocket 핸들러
-│       ├── BithumbWebSocketHandler.java       빗썸 WebSocket 핸들러
-│       └── BinanceWebSocketHandler.java       바이낸스 WebSocket 핸들러
+│   │   ├── BithumbWebSocketHandler.java      빗썸 WebSocket 핸들러
+│   │   ├── BithumbMarketResponse.java        빗썸 REST 응답 DTO
+│   │   └── BithumbTickerMessage.java         빗썸 WebSocket 메시지 DTO
+│   └── binance/
+│       ├── BinanceRestClient.java            바이낸스 24hr 티커 조회
+│       ├── BinanceWebSocketHandler.java      바이낸스 WebSocket 핸들러
+│       ├── BinanceTickerResponse.java        바이낸스 REST 응답 DTO
+│       └── BinanceTickerMessage.java         바이낸스 WebSocket 메시지 DTO
+├── metadata/
+│   ├── MarketInfoCache.java                  ConcurrentHashMap 기반 인메모리 캐시
+│   └── ExchangeInitializer.java              @PostConstruct 초기화, 메타데이터 로딩 오케스트레이터
 ├── rabbitmq/
-│   ├── RabbitMQConfig.java                  Fanout Exchange + RabbitTemplate 설정
-│   └── TickerEventPublisher.java            시세 변경 이벤트 발행
-├── redis/
-│   └── TickerRedisRepository.java             NormalizedTicker JSON 저장 + TTL
-└── collector/
-    └── RealtimePriceCollector.java            WebSocket 연결 오케스트레이터
+│   ├── RabbitMQConfig.java                   Fanout Exchange + RabbitTemplate 설정
+│   └── TickerEventPublisher.java             시세 변경 이벤트 발행
+└── redis/
+    └── TickerRedisRepository.java            NormalizedTicker JSON 저장 + TTL
 ```
 
 ## 컴포넌트 역할
@@ -130,7 +126,7 @@ ticker:
 logging:
   level:
     ksh.tryptocollector: DEBUG
-    ksh.tryptocollector.client.websocket: INFO
+    ksh.tryptocollector.exchange: INFO
 ```
 
 세 거래소 모두 공개 API를 사용하므로 API 키가 필요 없다.

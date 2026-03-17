@@ -40,7 +40,7 @@
 **DTO (사용 필드만):**
 
 ```java
-// client/rest/dto/BinanceTickerResponse.java
+// exchange/binance/BinanceTickerResponse.java
 public record BinanceTickerResponse(
     String symbol,               // "BTCUSDT"
     String lastPrice,            // "32287.00000000"
@@ -183,10 +183,10 @@ Flux.fromArray(messages)
 
 | 클래스 | 패키지 | 역할 |
 |--------|--------|------|
-| `BinanceRestClient` | `client.rest` | WebClient로 24hr 티커 조회, USDT 필터링, `MarketInfo` 리스트 + 초기 스냅샷 데이터 반환 |
-| `BinanceTickerResponse` | `client.rest.dto` | REST 응답 역직렬화 record |
-| `BinanceTickerMessage` | `client.websocket.dto` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
-| `BinanceWebSocketHandler` | `client.websocket` | `ExchangeTickerStream` 구현, 배열 배치 처리, 캐시 기반 필터링, 재연결 |
+| `BinanceRestClient` | `exchange.binance` | WebClient로 24hr 티커 조회, USDT 필터링, `MarketInfo` 리스트 + 초기 스냅샷 데이터 반환 |
+| `BinanceTickerResponse` | `exchange.binance` | REST 응답 역직렬화 record |
+| `BinanceTickerMessage` | `exchange.binance` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
+| `BinanceWebSocketHandler` | `exchange.binance` | `ExchangeTickerStream` 구현, 배열 배치 처리, 캐시 기반 필터링, 재연결 |
 
 ### BinanceRestClient
 

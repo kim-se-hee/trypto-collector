@@ -30,18 +30,19 @@
 
 ## 프로젝트 구조
 
-헥사고날 아키텍처를 적용하지 않는다. 기능별 패키지로 구성한다.
+소스는 거래소별, 싱크는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
 
 ```
 ksh.tryptocollector/
-  common/config/        설정 클래스 (WebClient)
-  common/model/         공통 모델 (Exchange enum, NormalizedTicker, TickerEvent)
-  metadata/             마켓 메타데이터 (MarketInfo, MarketInfoCache, ExchangeInitializer)
-  client/rest/          거래소별 REST 클라이언트 및 DTO
-  client/websocket/     거래소별 WebSocket 핸들러 및 DTO
-  redis/                Redis 저장소
-  rabbitmq/             RabbitMQ 설정 및 이벤트 발행
-  collector/            오케스트레이터 (WebSocket 생명주기 관리)
+  config/                 공유 인프라 설정 (WebClientConfig)
+  model/                  핵심 도메인 모델 (Exchange, NormalizedTicker, TickerEvent, MarketInfo)
+  exchange/               거래소 통합 — 인터페이스(ExchangeTickerStream) + 오케스트레이터(RealtimePriceCollector)
+    upbit/                업비트 REST 클라이언트, WebSocket 핸들러, DTO
+    bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
+    binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
+  metadata/               마켓 메타데이터 (MarketInfoCache, ExchangeInitializer)
+  redis/                  시세 저장 (TickerRedisRepository)
+  rabbitmq/               이벤트 발행 (TickerEventPublisher, RabbitMQConfig)
 ```
 
 ## 설정 주입

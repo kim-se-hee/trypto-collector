@@ -30,7 +30,7 @@
 **DTO:**
 
 ```java
-// client/rest/dto/UpbitMarketResponse.java
+// exchange/upbit/UpbitMarketResponse.java
 public record UpbitMarketResponse(
     String market,
     @JsonProperty("korean_name") String koreanName,
@@ -183,9 +183,10 @@ private byte[] decompressIfNeeded(ByteBuffer buffer) {
 
 | 클래스 | 패키지 | 역할 |
 |--------|--------|------|
-| `UpbitRestClient` | `client.rest` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
-| `UpbitTickerMessage` | `client.websocket.dto` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
-| `UpbitWebSocketHandler` | `client.websocket` | `ExchangeTickerStream` 구현, 바이너리 프레임 처리, gzip 해제, 구독/재연결 |
+| `UpbitRestClient` | `exchange.upbit` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
+| `UpbitMarketResponse` | `exchange.upbit` | REST 응답 역직렬화 record |
+| `UpbitTickerMessage` | `exchange.upbit` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
+| `UpbitWebSocketHandler` | `exchange.upbit` | `ExchangeTickerStream` 구현, 바이너리 프레임 처리, gzip 해제, 구독/재연결 |
 
 ### UpbitRestClient
 

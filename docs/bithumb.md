@@ -29,7 +29,7 @@
 **DTO:**
 
 ```java
-// client/rest/dto/BithumbMarketResponse.java (UpbitMarketResponse와 동일 구조)
+// exchange/bithumb/BithumbMarketResponse.java (UpbitMarketResponse와 동일 구조)
 public record BithumbMarketResponse(
     String market,
     @JsonProperty("korean_name") String koreanName,
@@ -106,9 +106,10 @@ market: "KRW-BTC"
 
 | 클래스 | 패키지 | 역할 |
 |--------|--------|------|
-| `BithumbRestClient` | `client.rest` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
-| `BithumbTickerMessage` | `client.websocket.dto` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
-| `BithumbWebSocketHandler` | `client.websocket` | `ExchangeTickerStream` 구현, 텍스트 프레임 처리, 구독/재연결 |
+| `BithumbRestClient` | `exchange.bithumb` | WebClient로 마켓 목록 조회, KRW- 필터링, `MarketInfo` 리스트 반환 |
+| `BithumbMarketResponse` | `exchange.bithumb` | REST 응답 역직렬화 record |
+| `BithumbTickerMessage` | `exchange.bithumb` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
+| `BithumbWebSocketHandler` | `exchange.bithumb` | `ExchangeTickerStream` 구현, 텍스트 프레임 처리, 구독/재연결 |
 
 ### BithumbRestClient
 
