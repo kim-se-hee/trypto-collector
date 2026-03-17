@@ -37,18 +37,6 @@
 }
 ```
 
-**DTO (사용 필드만):**
-
-```java
-// exchange/binance/BinanceTickerResponse.java
-public record BinanceTickerResponse(
-    String symbol,               // "BTCUSDT"
-    String lastPrice,            // "32287.00000000"
-    String priceChangePercent,   // "1.230"
-    String quoteVolume           // "786543210.50000000"
-) {}
-```
-
 **MarketInfo 변환:**
 
 ```
@@ -138,44 +126,15 @@ ExchangeInitializer.loadBinance():
 
 `!miniTicker@arr`에는 `P`(priceChangePercent) 필드가 없다. 시가(`o`)와 종가(`c`)를 사용하여 직접 계산한다.
 
-```java
-BigDecimal close = new BigDecimal(lastPrice);   // c
-BigDecimal open = new BigDecimal(openPrice);     // o
-BigDecimal changeRate = BigDecimal.ZERO;
-if (open.compareTo(BigDecimal.ZERO) != 0) {
-    changeRate = close.subtract(open)
-        .divide(open, 8, RoundingMode.HALF_UP);
-}
-// open=31886.50, close=32287.00 → (32287-31886.5)/31886.5 ≈ 0.01256482
-```
-
 ### USDT 필터링
 
 `!miniTicker@arr`는 **모든 심볼**을 전송한다 (2000+ 개). USDT 마켓만 처리해야 한다.
 
 필터링 방법: `MarketInfoCache`에 USDT 마켓만 적재했으므로, 캐시에 존재하는 심볼만 처리한다.
 
-```java
-cache.find(Exchange.BINANCE, message.symbol())  // 캐시에 없으면 무시
-    .ifPresent(metadata -> {
-        NormalizedTicker ticker = message.toNormalized(metadata.displayName());
-        tickerRedisRepository.save(ticker).subscribe();
-    });
-```
-
 ### 배열 배치 처리
 
-WebSocket이 ~1초마다 전체 심볼 배열을 전송하므로, Redis 쓰기를 bounded concurrency로 처리한다.
-
-```java
-Flux.fromArray(messages)
-    .filter(m -> cache.find(Exchange.BINANCE, m.symbol()).isPresent())
-    .flatMap(m -> {
-        MarketInfo meta = cache.find(Exchange.BINANCE, m.symbol()).orElseThrow();
-        return tickerRedisRepository.save(m.toNormalized(meta.displayName()));
-    }, 32)  // bounded concurrency 32
-    .then();
-```
+WebSocket이 ~1초마다 전체 심볼 배열을 전송하므로, Redis 쓰기를 bounded concurrency 32로 처리한다.
 
 ---
 
@@ -187,66 +146,6 @@ Flux.fromArray(messages)
 | `BinanceTickerResponse` | `exchange.binance` | REST 응답 역직렬화 record |
 | `BinanceTickerMessage` | `exchange.binance` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
 | `BinanceWebSocketHandler` | `exchange.binance` | `ExchangeTickerStream` 구현, 배열 배치 처리, 캐시 기반 필터링, 재연결 |
-
-### BinanceRestClient
-
-```java
-@Component
-public class BinanceRestClient {
-    private final WebClient webClient;
-    private final String restUrl;
-
-    public BinanceRestClient(
-            WebClient webClient,
-            @Value("${exchange.binance.rest-url}") String restUrl) {
-        this.webClient = webClient;
-        this.restUrl = restUrl;
-    }
-
-    public Flux<BinanceTickerResponse> fetchUsdtTickers() {
-        return webClient.get()
-            .uri(restUrl)
-            .retrieve()
-            .bodyToFlux(BinanceTickerResponse.class)
-            .filter(r -> r.symbol().endsWith("USDT"));
-    }
-}
-```
-
-> `BinanceRestClient`는 `MarketInfo`가 아닌 `BinanceTickerResponse`를 반환한다. 초기 스냅샷을 위해 `lastPrice`, `priceChangePercent` 등의 원본 데이터가 필요하기 때문이다. `MarketInfo` 변환과 Redis 저장은 `ExchangeInitializer`에서 수행한다.
-
-### BinanceTickerMessage
-
-`!miniTicker@arr` 스트림 대응. `P` 필드가 없으므로 `o`(시가)와 `c`(종가)로 changeRate를 직접 계산한다.
-
-```java
-public record BinanceTickerMessage(
-    @JsonProperty("s") String symbol,
-    @JsonProperty("c") String lastPrice,
-    @JsonProperty("o") String openPrice,
-    @JsonProperty("q") String quoteVolume,
-    @JsonProperty("E") long eventTime
-) {
-    public NormalizedTicker toNormalized(String displayName) {
-        String base = symbol.replace("USDT", "");
-        BigDecimal close = new BigDecimal(lastPrice);
-        BigDecimal open = new BigDecimal(openPrice);
-        BigDecimal changeRate = BigDecimal.ZERO;
-        if (open.compareTo(BigDecimal.ZERO) != 0) {
-            changeRate = close.subtract(open)
-                .divide(open, 8, RoundingMode.HALF_UP);
-        }
-        return new NormalizedTicker(
-            Exchange.BINANCE.name(),
-            base, "USDT", displayName,
-            close,
-            changeRate,
-            new BigDecimal(quoteVolume),
-            System.currentTimeMillis()
-        );
-    }
-}
-```
 
 ### BinanceWebSocketHandler
 

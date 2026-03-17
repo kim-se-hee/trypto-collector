@@ -26,17 +26,6 @@
 ]
 ```
 
-**DTO:**
-
-```java
-// exchange/bithumb/BithumbMarketResponse.java (UpbitMarketResponse와 동일 구조)
-public record BithumbMarketResponse(
-    String market,
-    @JsonProperty("korean_name") String koreanName,
-    @JsonProperty("english_name") String englishName
-) {}
-```
-
 > 빗썸 v1 API는 업비트의 API 형식을 미러링한다. REST 응답 구조와 WebSocket 메시지 형식이 모두 동일하다.
 
 **MarketInfo 변환:**
@@ -110,61 +99,6 @@ market: "KRW-BTC"
 | `BithumbMarketResponse` | `exchange.bithumb` | REST 응답 역직렬화 record |
 | `BithumbTickerMessage` | `exchange.bithumb` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
 | `BithumbWebSocketHandler` | `exchange.bithumb` | `ExchangeTickerStream` 구현, 텍스트 프레임 처리, 구독/재연결 |
-
-### BithumbRestClient
-
-```java
-@Component
-public class BithumbRestClient {
-    private final WebClient webClient;
-    private final String restUrl;
-
-    public BithumbRestClient(
-            WebClient webClient,
-            @Value("${exchange.bithumb.rest-url}") String restUrl) {
-        this.webClient = webClient;
-        this.restUrl = restUrl;
-    }
-
-    public Flux<MarketInfo> fetchKrwMarkets() {
-        return webClient.get()
-            .uri(restUrl)
-            .retrieve()
-            .bodyToFlux(BithumbMarketResponse.class)
-            .filter(r -> r.market().startsWith("KRW-"))
-            .map(r -> {
-                String base = r.market().substring(4);
-                return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
-            });
-    }
-}
-```
-
-### BithumbTickerMessage
-
-```java
-public record BithumbTickerMessage(
-    String code,
-    @JsonProperty("trade_price") BigDecimal tradePrice,
-    @JsonProperty("signed_change_rate") BigDecimal signedChangeRate,
-    @JsonProperty("acc_trade_price_24h") BigDecimal accTradePrice24h,
-    long timestamp
-) {
-    public NormalizedTicker toNormalized(String displayName) {
-        String base = code.substring(4);
-        return new NormalizedTicker(
-            Exchange.BITHUMB.name(),
-            base, "KRW", displayName,
-            tradePrice,
-            signedChangeRate,
-            accTradePrice24h,
-            System.currentTimeMillis()
-        );
-    }
-}
-```
-
-> `UpbitTickerMessage`와 구조가 동일하지만, `Exchange.BITHUMB`을 사용하므로 별도 record로 분리한다.
 
 ### BithumbWebSocketHandler
 

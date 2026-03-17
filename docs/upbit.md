@@ -27,17 +27,6 @@
 ]
 ```
 
-**DTO:**
-
-```java
-// exchange/upbit/UpbitMarketResponse.java
-public record UpbitMarketResponse(
-    String market,
-    @JsonProperty("korean_name") String koreanName,
-    @JsonProperty("english_name") String englishName
-) {}
-```
-
 **MarketInfo 변환:**
 
 ```
@@ -74,18 +63,6 @@ market: "KRW-BTC"
 ### 바이너리 프레임 처리
 
 업비트는 WebSocket 응답을 **바이너리 프레임**으로 전송한다. gzip으로 압축된 경우가 있으므로 매직 넘버를 확인하여 압축 해제해야 한다.
-
-```java
-private byte[] decompressIfNeeded(ByteBuffer buffer) {
-    byte[] bytes = new byte[buffer.remaining()];
-    buffer.get(bytes);
-    if (bytes.length > 2 && bytes[0] == (byte) 0x1f && bytes[1] == (byte) 0x8b) {
-        // gzip 매직 넘버 감지 → GZIPInputStream으로 압축 해제
-        return decompress(bytes);
-    }
-    return bytes;
-}
-```
 
 ### 응답 필드 (전체)
 
@@ -187,59 +164,6 @@ private byte[] decompressIfNeeded(ByteBuffer buffer) {
 | `UpbitMarketResponse` | `exchange.upbit` | REST 응답 역직렬화 record |
 | `UpbitTickerMessage` | `exchange.upbit` | WebSocket 메시지 역직렬화 record, `toNormalized(String displayName)` 포함 |
 | `UpbitWebSocketHandler` | `exchange.upbit` | `ExchangeTickerStream` 구현, 바이너리 프레임 처리, gzip 해제, 구독/재연결 |
-
-### UpbitRestClient
-
-```java
-@Component
-public class UpbitRestClient {
-    private final WebClient webClient;
-    private final String restUrl;
-
-    public UpbitRestClient(
-            WebClient webClient,
-            @Value("${exchange.upbit.rest-url}") String restUrl) {
-        this.webClient = webClient;
-        this.restUrl = restUrl;
-    }
-
-    public Flux<MarketInfo> fetchKrwMarkets() {
-        return webClient.get()
-            .uri(restUrl)
-            .retrieve()
-            .bodyToFlux(UpbitMarketResponse.class)
-            .filter(r -> r.market().startsWith("KRW-"))
-            .map(r -> {
-                String base = r.market().substring(4);
-                return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
-            });
-    }
-}
-```
-
-### UpbitTickerMessage
-
-```java
-public record UpbitTickerMessage(
-    String code,
-    @JsonProperty("trade_price") BigDecimal tradePrice,
-    @JsonProperty("signed_change_rate") BigDecimal signedChangeRate,
-    @JsonProperty("acc_trade_price_24h") BigDecimal accTradePrice24h,
-    long timestamp
-) {
-    public NormalizedTicker toNormalized(String displayName) {
-        String base = code.substring(4);  // "KRW-BTC" → "BTC"
-        return new NormalizedTicker(
-            Exchange.UPBIT.name(),
-            base, "KRW", displayName,
-            tradePrice,
-            signedChangeRate,
-            accTradePrice24h,
-            System.currentTimeMillis()
-        );
-    }
-}
-```
 
 ### UpbitWebSocketHandler
 
