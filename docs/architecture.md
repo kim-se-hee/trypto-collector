@@ -37,50 +37,6 @@ Redis                                  RabbitMQ (Fanout Exchange)   CandleBuffer
 trypto-backend (Redis에서 시세 조회)                                  candle_1m → CQ → 1h/4h/1d/1w/1M
 ```
 
-## 패키지 구조
-
-```
-src/main/java/ksh/tryptocollector/
-├── TryptoCollectorApplication.java
-├── config/
-│   └── WebClientConfig.java                  WebClient 설정 (maxInMemorySize 5MB)
-├── model/
-│   ├── Exchange.java                         enum: UPBIT, BITHUMB, BINANCE
-│   ├── NormalizedTicker.java                 정규화된 시세 record
-│   ├── TickerEvent.java                      RabbitMQ 시세 변경 이벤트 record
-│   └── MarketInfo.java                       마켓 메타데이터 record
-├── exchange/
-│   ├── ExchangeTickerStream.java             인터페이스: Mono<Void> connect()
-│   ├── RealtimePriceCollector.java           WebSocket 연결 오케스트레이터
-│   ├── upbit/
-│   │   ├── UpbitRestClient.java              업비트 마켓 목록 조회
-│   │   ├── UpbitWebSocketHandler.java        업비트 WebSocket 핸들러
-│   │   ├── UpbitMarketResponse.java          업비트 REST 응답 DTO
-│   │   └── UpbitTickerMessage.java           업비트 WebSocket 메시지 DTO
-│   ├── bithumb/
-│   │   ├── BithumbRestClient.java            빗썸 마켓 목록 조회
-│   │   ├── BithumbWebSocketHandler.java      빗썸 WebSocket 핸들러
-│   │   ├── BithumbMarketResponse.java        빗썸 REST 응답 DTO
-│   │   └── BithumbTickerMessage.java         빗썸 WebSocket 메시지 DTO
-│   └── binance/
-│       ├── BinanceRestClient.java            바이낸스 24hr 티커 조회
-│       ├── BinanceWebSocketHandler.java      바이낸스 WebSocket 핸들러
-│       ├── BinanceTickerResponse.java        바이낸스 REST 응답 DTO
-│       └── BinanceTickerMessage.java         바이낸스 WebSocket 메시지 DTO
-├── metadata/
-│   ├── MarketInfoCache.java                  ConcurrentHashMap 기반 인메모리 캐시
-│   └── ExchangeInitializer.java              @PostConstruct 초기화, 메타데이터 로딩 오케스트레이터
-├── candle/
-│   ├── CandleBuffer.java                     인메모리 OHLC 버퍼
-│   ├── CandleSnapshot.java                   완성된 분봉 데이터 record
-│   └── CandleFlushScheduler.java             @Scheduled 1분 주기 flush + InfluxDB write
-├── rabbitmq/
-│   ├── RabbitMQConfig.java                   Fanout Exchange + RabbitTemplate 설정
-│   └── TickerEventPublisher.java             시세 변경 이벤트 발행
-└── redis/
-    └── TickerRedisRepository.java            NormalizedTicker JSON 저장 + TTL
-```
-
 ## 컴포넌트 역할
 
 | 컴포넌트 | 역할 |

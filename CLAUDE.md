@@ -31,20 +31,30 @@
 
 ## 프로젝트 구조
 
-소스는 거래소별, 싱크는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
+소스(거래소)는 거래소별, 싱크(저장소/브로커)는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
 
 ```
 ksh.tryptocollector/
-  config/                 공유 인프라 설정
-  model/                  핵심 도메인 모델 (enum, record)
-  exchange/               거래소 통합 인터페이스 + 오케스트레이터
-    upbit/                업비트 REST 클라이언트, WebSocket 핸들러, DTO
-    bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
-    binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
-  metadata/               마켓 메타데이터 캐시 + 초기화
-  candle/                 인메모리 분봉 생성 + InfluxDB 저장
-  redis/                  시세 Redis 저장
-  rabbitmq/               시세 이벤트 RabbitMQ 발행
+├── config/        # 공유 인프라 설정 (WebClient 등)
+├── model/         # 정규화된 도메인 모델 (enum, record)
+├── exchange/      # 거래소 공통 인터페이스, WebSocket 오케스트레이터
+│   ├── upbit/     # 업비트 REST + WebSocket + DTO
+│   ├── bithumb/   # 빗썸 REST + WebSocket + DTO
+│   └── binance/   # 바이낸스 REST + WebSocket + DTO
+├── metadata/      # 마켓 메타데이터 캐시, 초기화
+├── candle/        # 인메모리 분봉 생성, InfluxDB 저장
+├── redis/         # 시세 Redis 저장
+└── rabbitmq/      # 시세 이벤트 RabbitMQ 발행
+```
+
+각 거래소 패키지 내부는 동일한 구조를 따른다.
+
+```
+{exchange}/
+├── {Exchange}RestClient.java          # 마켓 목록 REST 조회
+├── {Exchange}WebSocketHandler.java    # 실시간 시세 WebSocket 수신
+├── {Exchange}MarketResponse.java      # REST 응답 DTO
+└── {Exchange}TickerMessage.java       # WebSocket 메시지 DTO
 ```
 
 ## 설정 주입
