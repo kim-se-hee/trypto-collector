@@ -17,7 +17,7 @@ exchange:
     ws-url: wss://api.upbit.com/websocket/v1
   bithumb:
     rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
-    ws-url: wss://pubwss.bithumb.com/pub/ws
+    ws-url: wss://ws-api.bithumb.com/websocket/v1
   binance:
     rest-url: https://api.binance.com/api/v3/ticker/24hr
     ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr

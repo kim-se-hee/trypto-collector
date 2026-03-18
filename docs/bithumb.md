@@ -45,7 +45,7 @@ market: "KRW-BTC"
 
 ### 연결 정보
 
-- **URL:** `wss://pubwss.bithumb.com/pub/ws`
+- **URL:** `wss://ws-api.bithumb.com/websocket/v1`
 - **프레임 유형:** 텍스트 (업비트와 달리 바이너리/gzip이 아님)
 - **구독 메시지:** 연결 직후 JSON 배열로 전송
 
@@ -81,7 +81,7 @@ market: "KRW-BTC"
 
 | 항목 | 업비트 | 빗썸 |
 |------|--------|------|
-| WebSocket URL | `wss://api.upbit.com/websocket/v1` | `wss://pubwss.bithumb.com/pub/ws` |
+| WebSocket URL | `wss://api.upbit.com/websocket/v1` | `wss://ws-api.bithumb.com/websocket/v1` |
 | 프레임 유형 | 바이너리 (gzip 가능) | 텍스트 |
 | 구독 형식 | 동일 | 동일 |
 | 응답 필드 | 동일 | 동일 |
