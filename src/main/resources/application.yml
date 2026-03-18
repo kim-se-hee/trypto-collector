@@ -26,6 +26,9 @@ ticker:
   redis-ttl-seconds: 30
   redis-key-prefix: ticker
 
+market-meta:
+  redis-key-prefix: market-meta
+
 influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
   token: ${INFLUXDB_TOKEN}
