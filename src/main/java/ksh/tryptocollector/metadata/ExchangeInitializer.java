@@ -13,9 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 
 @Slf4j
 @Component
@@ -29,11 +31,14 @@ public class ExchangeInitializer {
     private final BithumbRestClient bithumbRestClient;
     private final BinanceRestClient binanceRestClient;
 
+    private static final Retry INIT_RETRY = Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1))
+            .maxBackoff(Duration.ofSeconds(60));
+
     @PostConstruct
     void init() {
-        loadUpbit().subscribe();
-        loadBithumb().subscribe();
-        loadBinance().subscribe();
+        loadUpbit().retryWhen(INIT_RETRY).subscribe();
+        loadBithumb().retryWhen(INIT_RETRY).subscribe();
+        loadBinance().retryWhen(INIT_RETRY).subscribe();
     }
 
     Mono<Void> loadUpbit() {
