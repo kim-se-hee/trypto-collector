@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
@@ -81,7 +80,6 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
         DataBuffer buffer = message.getPayload();
         byte[] bytes = new byte[buffer.readableByteCount()];
         buffer.read(bytes);
-        DataBufferUtils.release(buffer);
         return bytes;
     }
 
