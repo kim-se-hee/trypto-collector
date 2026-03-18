@@ -29,6 +29,14 @@ public class MarketInfoCache {
                 .toList();
     }
 
+    public List<MarketInfo> getMarketInfos(Exchange exchange) {
+        String prefix = exchange.name() + ":";
+        return cache.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(prefix))
+                .map(java.util.Map.Entry::getValue)
+                .toList();
+    }
+
     public void clear(Exchange exchange) {
         String prefix = exchange.name() + ":";
         cache.keySet().removeIf(key -> key.startsWith(prefix));
