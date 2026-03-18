@@ -30,12 +30,12 @@ NormalizedTicker
     InfluxDB 배치 write
             │
             ▼
-    Continuous Query 자동 집계
-        ├── candle_1h
-        ├── candle_4h
-        ├── candle_1d
-        ├── candle_1w
-        └── candle_1M
+    Flux Task 계단식 집계
+        candle_1m → candle_1h
+                     ├── candle_4h
+                     └── candle_1d
+                          ├── candle_1w (월요일 시작)
+                          └── candle_1M (1일 시작)
 ```
 
 ---
@@ -86,17 +86,37 @@ flush 시점에서 1분을 뺀 분의 시작 시각을 사용한다. 예: 10:05:
 | field | `close` | 종가 | |
 | timestamp | | 해당 분의 시작 시각 | `2026-03-18T10:04:00Z` |
 
-### Continuous Query
+### Flux Task (상위 타임프레임 집계)
 
-`candle_1m`을 원본으로 상위 타임프레임을 자동 집계한다.
+계단식 집계로 상위 타임프레임을 생성한다. 각 Task는 바로 아래 단계의 measurement를 원본으로 사용하여 계산량을 최소화한다.
 
-| measurement | 집계 주기 | 집계 방식 |
-|-------------|-----------|-----------|
-| `candle_1h` | 1시간 | `first(open)`, `max(high)`, `min(low)`, `last(close)` |
-| `candle_4h` | 4시간 | 동일 |
-| `candle_1d` | 1일 | 동일 |
-| `candle_1w` | 1주 | 동일 |
-| `candle_1M` | 1개월 | 동일 |
+```
+candle_1m → candle_1h (매 1시간)
+candle_1h → candle_4h (매 4시간)
+candle_1h → candle_1d (매 1일)
+candle_1d → candle_1w (매 1주, 월요일 시작)
+candle_1d → candle_1M (매 1개월, 1일 시작)
+```
+
+| measurement | source | 집계 주기 | 집계 방식 | 비고 |
+|-------------|--------|-----------|-----------|------|
+| `candle_1h` | `candle_1m` | 1시간 | `first(open)`, `max(high)`, `min(low)`, `last(close)` | |
+| `candle_4h` | `candle_1h` | 4시간 | 동일 | |
+| `candle_1d` | `candle_1h` | 1일 | 동일 | |
+| `candle_1w` | `candle_1d` | 1주 | 동일 | `offset: 4d`로 월요일 시작 |
+| `candle_1M` | `candle_1d` | 1개월 | 동일 | calendar duration |
+
+Task 정의는 `influxdb/init-tasks.sh`에 있으며, Docker 초기 setup 시 자동 생성된다.
+
+#### 실행 순서
+
+Task 간 offset 체인으로 이전 단계의 write 완료를 보장한다.
+
+| Task | offset | 이유 |
+|------|--------|------|
+| `candle_1h` | 1m | `CandleFlushScheduler`(매분 :00)의 write 완료 대기 |
+| `candle_4h`, `candle_1d` | 2m | `candle_1h` Task 완료 대기 |
+| `candle_1w`, `candle_1M` | 3m | `candle_1d` Task 완료 대기 |
 
 ### 조회
 
