@@ -10,11 +10,26 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+  influxdb:
+    image: influxdb:2-alpine
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+      DOCKER_INFLUXDB_INIT_ORG: trypto
+      DOCKER_INFLUXDB_INIT_BUCKET: candle
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: trypto-collector-token
+
   app:
     build: .
     depends_on:
       - redis
       - rabbitmq
+      - influxdb
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: trypto-collector-token

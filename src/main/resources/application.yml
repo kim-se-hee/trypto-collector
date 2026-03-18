@@ -26,6 +26,12 @@ ticker:
   redis-ttl-seconds: 30
   redis-key-prefix: ticker
 
+influxdb:
+  url: ${INFLUXDB_URL:http://localhost:8086}
+  token: ${INFLUXDB_TOKEN}
+  org: ${INFLUXDB_ORG:trypto}
+  bucket: ${INFLUXDB_BUCKET:candle}
+
 logging:
   level:
     ksh.tryptocollector: DEBUG
