@@ -89,7 +89,7 @@ ksh.tryptocollector/
 ## 공통 컨벤션
 
 - 모든 의존성은 `@RequiredArgsConstructor` + `private final`로 생성자 주입한다. `@Autowired` 필드 주입 금지
-- `@Value` 파라미터가 있는 클래스는 `@RequiredArgsConstructor` 대신 명시적 생성자를 작성한다
+- `@Value` 설정값은 `private` 필드에 직접 주입한다 (`final` 제외)
 - Entity에는 `@Getter`만 허용하고 `@Setter`, `@Data` 금지
 - 컬렉션을 반환할 때 null 대신 빈 컬렉션을 반환한다
 - `Optional`은 메서드 반환 타입으로만 사용한다. 필드나 파라미터에 사용하지 않는다
