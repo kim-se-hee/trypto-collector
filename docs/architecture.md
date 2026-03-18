@@ -2,7 +2,7 @@
 
 ## 개요
 
-trypto-collector는 업비트, 빗썸, 바이낸스 세 거래소의 실시간 시세를 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하는 Spring WebFlux 기반 수집기다. 백엔드(trypto-backend)는 Redis에서 시세를 조회하여 수익률 계산 등에 활용하고, RabbitMQ 이벤트를 수신하여 미체결 주문 매칭에 활용한다.
+trypto-collector는 업비트, 빗썸, 바이낸스 세 거래소의 실시간 시세를 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, 인메모리에서 1분봉을 생성하여 InfluxDB에 저장하는 Spring WebFlux 기반 수집기다. 백엔드(trypto-backend)는 Redis에서 시세를 조회하여 수익률 계산 등에 활용하고, RabbitMQ 이벤트를 수신하여 미체결 주문 매칭에, InfluxDB에서 캔들 데이터를 조회하여 차트 표시에 활용한다.
 
 헥사고날 아키텍처를 적용하지 않는다. 외부 API → 정규화 → Redis 저장의 단순한 단방향 파이프라인이므로, 소스(거래소)별 + 싱크(기술)별 패키지로 충분하다.
 
@@ -20,61 +20,21 @@ ExchangeInitializer (각 거래소 독립 로딩, 실패 격리)
             ▼
 RealtimePriceCollector (WebSocket 생명주기 관리)
     ├── UpbitWebSocketHandler.connect()
-    │     → 구독 메시지 전송 → 바이너리 프레임 수신 → gzip 해제 → UpbitTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행
+    │     → 구독 메시지 전송 → 바이너리 프레임 수신 → gzip 해제 → UpbitTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행 + CandleBuffer 갱신
     ├── BithumbWebSocketHandler.connect()
-    │     → 구독 메시지 전송 → 텍스트 프레임 수신 → BithumbTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행
+    │     → 구독 메시지 전송 → 텍스트 프레임 수신 → BithumbTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행 + CandleBuffer 갱신
     └── BinanceWebSocketHandler.connect()
-          → 배열 배치 수신 → 캐시 기반 USDT 필터링 → BinanceTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행 (concurrency 32)
+          → 배열 배치 수신 → 캐시 기반 USDT 필터링 → BinanceTickerMessage → toNormalized() → Redis 저장 + RabbitMQ 발행 + CandleBuffer 갱신 (concurrency 32)
             │
-            ├──────────────────────────────────┐
-            ▼                                  ▼
-Redis                                  RabbitMQ (Fanout Exchange: ticker.exchange)
-    Key: ticker:{EXCHANGE}:{BASE}/{QUOTE}      │
-    Value: JSON NormalizedTicker         ┌─────┼─────┐
-    TTL: 30초                         Server A  Server B  Server C
-            │                          (미체결 주문 매칭)
-            ▼
-trypto-backend (Redis에서 시세 조회)
-```
-
-## 패키지 구조
-
-```
-src/main/java/ksh/tryptocollector/
-├── TryptoCollectorApplication.java
-├── config/
-│   └── WebClientConfig.java                  WebClient 설정 (maxInMemorySize 5MB)
-├── model/
-│   ├── Exchange.java                         enum: UPBIT, BITHUMB, BINANCE
-│   ├── NormalizedTicker.java                 정규화된 시세 record
-│   ├── TickerEvent.java                      RabbitMQ 시세 변경 이벤트 record
-│   └── MarketInfo.java                       마켓 메타데이터 record
-├── exchange/
-│   ├── ExchangeTickerStream.java             인터페이스: Mono<Void> connect()
-│   ├── RealtimePriceCollector.java           WebSocket 연결 오케스트레이터
-│   ├── upbit/
-│   │   ├── UpbitRestClient.java              업비트 마켓 목록 조회
-│   │   ├── UpbitWebSocketHandler.java        업비트 WebSocket 핸들러
-│   │   ├── UpbitMarketResponse.java          업비트 REST 응답 DTO
-│   │   └── UpbitTickerMessage.java           업비트 WebSocket 메시지 DTO
-│   ├── bithumb/
-│   │   ├── BithumbRestClient.java            빗썸 마켓 목록 조회
-│   │   ├── BithumbWebSocketHandler.java      빗썸 WebSocket 핸들러
-│   │   ├── BithumbMarketResponse.java        빗썸 REST 응답 DTO
-│   │   └── BithumbTickerMessage.java         빗썸 WebSocket 메시지 DTO
-│   └── binance/
-│       ├── BinanceRestClient.java            바이낸스 24hr 티커 조회
-│       ├── BinanceWebSocketHandler.java      바이낸스 WebSocket 핸들러
-│       ├── BinanceTickerResponse.java        바이낸스 REST 응답 DTO
-│       └── BinanceTickerMessage.java         바이낸스 WebSocket 메시지 DTO
-├── metadata/
-│   ├── MarketInfoCache.java                  ConcurrentHashMap 기반 인메모리 캐시
-│   └── ExchangeInitializer.java              @PostConstruct 초기화, 메타데이터 로딩 오케스트레이터
-├── rabbitmq/
-│   ├── RabbitMQConfig.java                   Fanout Exchange + RabbitTemplate 설정
-│   └── TickerEventPublisher.java             시세 변경 이벤트 발행
-└── redis/
-    └── TickerRedisRepository.java            NormalizedTicker JSON 저장 + TTL
+            ├──────────────────────────────────┬──────────────────────────┐
+            ▼                                  ▼                          ▼
+Redis                                  RabbitMQ (Fanout Exchange)   CandleBuffer (인메모리 OHLC)
+    Key: ticker:{EXCHANGE}:{BASE}/{QUOTE}      │                          │
+    Value: JSON NormalizedTicker         ┌─────┼─────┐              @Scheduled (1분)
+    TTL: 30초                         Server A  Server B  Server C        │
+            │                          (미체결 주문 매칭)                  ▼
+            ▼                                                     InfluxDB (배치 write)
+trypto-backend (Redis에서 시세 조회)                                  candle_1m → CQ → 1h/4h/1d/1w/1M
 ```
 
 ## 컴포넌트 역할
@@ -84,10 +44,12 @@ src/main/java/ksh/tryptocollector/
 | `ExchangeInitializer` | 애플리케이션 시작 시 각 거래소 REST API를 호출하여 마켓 메타데이터를 로딩하고, 완료 후 WebSocket 연결을 트리거한다. 각 거래소는 독립적으로 로딩되어 하나가 실패해도 나머지에 영향이 없다. |
 | `MarketInfoCache` | `ConcurrentHashMap` 기반 인메모리 캐시. 거래소별 심볼 코드 → `MarketInfo` 매핑을 저장한다. WebSocket 핸들러가 displayName 조회 및 바이낸스 USDT 필터링에 사용한다. |
 | `{거래소}RestClient` | WebClient로 거래소 REST API를 호출하여 마켓 목록을 조회한다. KRW/USDT 마켓만 필터링한다. |
-| `{거래소}WebSocketHandler` | 거래소 WebSocket에 연결하여 실시간 시세를 수신한다. 수신된 메시지를 `NormalizedTicker`로 변환하여 Redis 저장과 RabbitMQ 이벤트 발행을 병렬로 수행한다. 연결 끊김 시 지수 백오프로 재연결한다. |
+| `{거래소}WebSocketHandler` | 거래소 WebSocket에 연결하여 실시간 시세를 수신한다. 수신된 메시지를 `NormalizedTicker`로 변환하여 Redis 저장, RabbitMQ 이벤트 발행, CandleBuffer 갱신을 수행한다. 연결 끊김 시 지수 백오프로 재연결한다. |
 | `TickerEventPublisher` | `NormalizedTicker`를 `TickerEvent`로 변환하여 RabbitMQ Fanout Exchange에 발행한다. Publisher Confirms로 브로커 수신을 확인한다. 블로킹 `RabbitTemplate`을 `boundedElastic` 스케줄러에서 실행한다. |
 | `RealtimePriceCollector` | `ExchangeInitializer`에 의해 호출되어 각 거래소 WebSocket 연결을 시작하고 관리한다. |
 | `TickerRedisRepository` | `NormalizedTicker`를 JSON으로 직렬화하여 Redis에 저장한다. TTL 30초로 설정하여 WebSocket이 끊기면 자동 만료된다. |
+| `CandleBuffer` | `ConcurrentHashMap` 기반 인메모리 버퍼. 코인별로 1분 주기 동안의 OHLC를 추적한다. 시세 수신 시 갱신되고, 1분마다 flush된다. |
+| `CandleFlushScheduler` | `@Scheduled`로 1분마다 `CandleBuffer`에서 완성된 분봉을 꺼내 InfluxDB에 배치 write한다. |
 | `RabbitMQConfig` | Fanout Exchange(`ticker.exchange`) 선언, Publisher Confirms가 설정된 `RabbitTemplate` 빈 등록. |
 
 ## 설정 전략

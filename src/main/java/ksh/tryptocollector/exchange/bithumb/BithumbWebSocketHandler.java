@@ -1,11 +1,10 @@
 package ksh.tryptocollector.exchange.bithumb;
 
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
+import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
-import ksh.tryptocollector.model.NormalizedTicker;
-import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
-import ksh.tryptocollector.redis.TickerRedisRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,28 +20,15 @@ import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class BithumbWebSocketHandler implements ExchangeTickerStream {
     private final ReactorNettyWebSocketClient webSocketClient;
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
-    private final TickerRedisRepository tickerRedisRepository;
-    private final TickerEventPublisher tickerEventPublisher;
-    private final String wsUrl;
+    private final TickerSinkProcessor tickerSinkProcessor;
 
-    public BithumbWebSocketHandler(
-            ReactorNettyWebSocketClient webSocketClient,
-            ObjectMapper objectMapper,
-            MarketInfoCache marketInfoCache,
-            TickerRedisRepository tickerRedisRepository,
-            TickerEventPublisher tickerEventPublisher,
-            @Value("${exchange.bithumb.ws-url}") String wsUrl) {
-        this.webSocketClient = webSocketClient;
-        this.objectMapper = objectMapper;
-        this.marketInfoCache = marketInfoCache;
-        this.tickerRedisRepository = tickerRedisRepository;
-        this.tickerEventPublisher = tickerEventPublisher;
-        this.wsUrl = wsUrl;
-    }
+    @Value("${exchange.bithumb.ws-url}")
+    private String wsUrl;
 
     @Override
     public Mono<Void> connect() {
@@ -51,7 +37,7 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
                     Mono<Void> send = session.send(
                             Mono.just(session.textMessage(subscribeMessage)));
                     Mono<Void> receive = session.receive()
-                            .doOnNext(this::handleMessage)
+                            .flatMap(this::handleMessage)
                             .then();
                     return send.then(receive);
                 })
@@ -69,20 +55,16 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
                 objectMapper.writeValueAsString(codes) + "}]";
     }
 
-    private void handleMessage(WebSocketMessage message) {
+    private Mono<Void> handleMessage(WebSocketMessage message) {
         try {
             String payload = message.getPayloadAsText();
             BithumbTickerMessage ticker = objectMapper.readValue(payload, BithumbTickerMessage.class);
-            marketInfoCache.find(Exchange.BITHUMB, ticker.code())
-                    .ifPresent(meta -> {
-                        NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
-                        Mono.when(
-                                tickerRedisRepository.save(normalized),
-                                tickerEventPublisher.publish(normalized)
-                        ).subscribe();
-                    });
+            return marketInfoCache.find(Exchange.BITHUMB, ticker.code())
+                    .map(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())))
+                    .orElse(Mono.empty());
         } catch (Exception e) {
             log.debug("빗썸 메시지 처리 실패: {}", e.getMessage());
+            return Mono.empty();
         }
     }
 }

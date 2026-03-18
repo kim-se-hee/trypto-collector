@@ -31,7 +31,27 @@ rm -f "$HOME/.claude/implement-phase.json"
 
 ---
 
-## Phase 1: 탐색
+## Phase 1: 워크트리 · 브랜치 생성
+
+`$ARGUMENTS`에서 파일명(확장자 제외)을 추출하여 브랜치와 워크트리를 만든다.
+
+- 예: `docs/candle.md` → 브랜치 `feature/candle`, 워크트리 `candle`
+
+```bash
+# 파일명 추출 (예: docs/candle.md → candle)
+FEATURE_NAME=$(basename "$ARGUMENTS" .md)
+BRANCH_NAME="feature/${FEATURE_NAME}"
+WORKTREE_PATH="../trypto-collector-${FEATURE_NAME}"
+
+git branch "$BRANCH_NAME" main
+git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
+```
+
+워크트리 생성 후 해당 워크트리 경로로 이동하여 이후 Phase를 진행한다.
+
+---
+
+## Phase 2: 탐색
 
 이 단계에서는 반드시 읽기만 수행한다.
 
@@ -57,12 +77,12 @@ rm -f "$HOME/.claude/implement-phase.json"
 
 ---
 
-## Phase 2: 구현
+## Phase 3: 구현
 
 CLAUDE.md의 코딩 컨벤션과 Git 컨벤션을 따라 구현한다.
-해당 기능에 필요한 패키지만, **의존 방향(의존 대상 먼저)**을 따라 구현한다. 
+해당 기능에 필요한 패키지만, **의존 방향(의존 대상 먼저)**을 따라 구현한다.
 
-## Phase 3: 코드 리뷰
+## Phase 4: 코드 리뷰
 
 아래 4개의 리뷰어 서브에이전트를 **병렬**로 실행한다.
 

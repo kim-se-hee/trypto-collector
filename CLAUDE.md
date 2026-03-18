@@ -21,6 +21,7 @@
 | 메시지 브로커 | RabbitMQ (Spring AMQP) | |
 | HTTP 클라이언트 | WebClient (Reactor Netty) | |
 | WebSocket 클라이언트 | ReactorNettyWebSocketClient | |
+| 시계열 DB | InfluxDB (`influxdb-client-java`) | |
 | 유틸리티 | Lombok | |
 | 컨테이너 | Docker Compose | |
 
@@ -30,19 +31,30 @@
 
 ## 프로젝트 구조
 
-소스는 거래소별, 싱크는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
+소스(거래소)는 거래소별, 싱크(저장소/브로커)는 기술별로 패키징한다. 패키지 내부는 플랫하게 유지한다.
 
 ```
 ksh.tryptocollector/
-  config/                 공유 인프라 설정 (WebClientConfig)
-  model/                  핵심 도메인 모델 (Exchange, NormalizedTicker, TickerEvent, MarketInfo)
-  exchange/               거래소 통합 — 인터페이스(ExchangeTickerStream) + 오케스트레이터(RealtimePriceCollector)
-    upbit/                업비트 REST 클라이언트, WebSocket 핸들러, DTO
-    bithumb/              빗썸 REST 클라이언트, WebSocket 핸들러, DTO
-    binance/              바이낸스 REST 클라이언트, WebSocket 핸들러, DTO
-  metadata/               마켓 메타데이터 (MarketInfoCache, ExchangeInitializer)
-  redis/                  시세 저장 (TickerRedisRepository)
-  rabbitmq/               이벤트 발행 (TickerEventPublisher, RabbitMQConfig)
+├── config/        # 공유 인프라 설정 (WebClient 등)
+├── model/         # 정규화된 도메인 모델 (enum, record)
+├── exchange/      # 거래소 공통 인터페이스, WebSocket 오케스트레이터
+│   ├── upbit/     # 업비트 REST + WebSocket + DTO
+│   ├── bithumb/   # 빗썸 REST + WebSocket + DTO
+│   └── binance/   # 바이낸스 REST + WebSocket + DTO
+├── metadata/      # 마켓 메타데이터 캐시, 초기화
+├── candle/        # 인메모리 분봉 생성, InfluxDB 저장
+├── redis/         # 시세 Redis 저장
+└── rabbitmq/      # 시세 이벤트 RabbitMQ 발행
+```
+
+각 거래소 패키지 내부는 동일한 구조를 따른다.
+
+```
+{exchange}/
+├── {Exchange}RestClient.java          # 마켓 목록 REST 조회
+├── {Exchange}WebSocketHandler.java    # 실시간 시세 WebSocket 수신
+├── {Exchange}MarketResponse.java      # REST 응답 DTO
+└── {Exchange}TickerMessage.java       # WebSocket 메시지 DTO
 ```
 
 ## 설정 주입
@@ -77,7 +89,7 @@ ksh.tryptocollector/
 ## 공통 컨벤션
 
 - 모든 의존성은 `@RequiredArgsConstructor` + `private final`로 생성자 주입한다. `@Autowired` 필드 주입 금지
-- `@Value` 파라미터가 있는 클래스는 `@RequiredArgsConstructor` 대신 명시적 생성자를 작성한다
+- `@Value` 설정값은 `private` 필드에 직접 주입한다 (`final` 제외)
 - Entity에는 `@Getter`만 허용하고 `@Setter`, `@Data` 금지
 - 컬렉션을 반환할 때 null 대신 빈 컬렉션을 반환한다
 - `Optional`은 메서드 반환 타입으로만 사용한다. 필드나 파라미터에 사용하지 않는다
@@ -154,3 +166,4 @@ GitHub Flow를 따른다. `main` 브랜치와 `feature/*` 브랜치만 사용한
 - 전체 아키텍처: `docs/architecture.md`
 - 공통 인프라: `docs/common-infrastructure.md`
 - 거래소별: `docs/upbit.md`, `docs/bithumb.md`, `docs/binance.md`
+- 캔들 데이터 수집: `docs/candle.md`

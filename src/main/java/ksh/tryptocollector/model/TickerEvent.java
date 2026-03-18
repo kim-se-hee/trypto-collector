@@ -6,6 +6,7 @@ public record TickerEvent(
         String exchange,
         String symbol,
         BigDecimal currentPrice,
+        BigDecimal changeRate,
         long timestamp
 ) {
     public static TickerEvent from(NormalizedTicker ticker) {
@@ -13,6 +14,7 @@ public record TickerEvent(
                 ticker.exchange(),
                 ticker.base() + "/" + ticker.quote(),
                 ticker.lastPrice(),
+                ticker.changeRate(),
                 ticker.tsMs()
         );
     }
