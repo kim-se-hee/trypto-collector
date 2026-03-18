@@ -3,17 +3,33 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   influxdb:
     image: influxdb:2-alpine
     ports:
       - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: admin
@@ -21,15 +37,28 @@ services:
       DOCKER_INFLUXDB_INIT_ORG: trypto
       DOCKER_INFLUXDB_INIT_BUCKET: candle
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: trypto-collector-token
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   app:
     build: .
     depends_on:
-      - redis
-      - rabbitmq
-      - influxdb
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: trypto-collector-token
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  influxdb-data:
