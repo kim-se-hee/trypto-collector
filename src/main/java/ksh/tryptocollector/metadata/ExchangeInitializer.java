@@ -8,6 +8,7 @@ import ksh.tryptocollector.exchange.upbit.UpbitRestClient;
 import ksh.tryptocollector.model.Exchange;
 import ksh.tryptocollector.model.MarketInfo;
 import ksh.tryptocollector.model.NormalizedTicker;
+import ksh.tryptocollector.redis.MarketMetadataRedisRepository;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class ExchangeInitializer {
     private final MarketInfoCache marketInfoCache;
     private final RealtimePriceCollector realtimePriceCollector;
     private final TickerRedisRepository tickerRedisRepository;
+    private final MarketMetadataRedisRepository marketMetadataRedisRepository;
     private final UpbitRestClient upbitRestClient;
     private final BithumbRestClient bithumbRestClient;
     private final BinanceRestClient binanceRestClient;
@@ -44,9 +46,11 @@ public class ExchangeInitializer {
     Mono<Void> loadUpbit() {
         return upbitRestClient.fetchKrwMarkets()
                 .doOnNext(info -> marketInfoCache.put(Exchange.UPBIT, "KRW-" + info.base(), info))
-                .doOnComplete(() -> {
-                    log.info("업비트 마켓 메타데이터 로드 완료");
+                .collectList()
+                .flatMap(infos -> {
+                    log.info("업비트 마켓 메타데이터 로드 완료: {}개", infos.size());
                     realtimePriceCollector.connectUpbit();
+                    return marketMetadataRedisRepository.save(Exchange.UPBIT, infos);
                 })
                 .then();
     }
@@ -54,9 +58,11 @@ public class ExchangeInitializer {
     Mono<Void> loadBithumb() {
         return bithumbRestClient.fetchKrwMarkets()
                 .doOnNext(info -> marketInfoCache.put(Exchange.BITHUMB, "KRW-" + info.base(), info))
-                .doOnComplete(() -> {
-                    log.info("빗썸 마켓 메타데이터 로드 완료");
+                .collectList()
+                .flatMap(infos -> {
+                    log.info("빗썸 마켓 메타데이터 로드 완료: {}개", infos.size());
                     realtimePriceCollector.connectBithumb();
+                    return marketMetadataRedisRepository.save(Exchange.BITHUMB, infos);
                 })
                 .then();
     }
@@ -84,10 +90,12 @@ public class ExchangeInitializer {
                     );
                     return tickerRedisRepository.save(normalized);
                 })
-                .doOnComplete(() -> {
+                .then(Mono.defer(() -> {
                     log.info("바이낸스 마켓 메타데이터 로드 및 초기 스냅샷 저장 완료");
                     realtimePriceCollector.connectBinance();
-                })
+                    return marketMetadataRedisRepository.save(
+                            Exchange.BINANCE, marketInfoCache.getMarketInfos(Exchange.BINANCE));
+                }))
                 .then();
     }
 }
