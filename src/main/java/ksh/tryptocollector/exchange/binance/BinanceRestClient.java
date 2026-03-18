@@ -2,26 +2,33 @@ package ksh.tryptocollector.exchange.binance;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
+import org.springframework.web.client.RestClient;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class BinanceRestClient {
-    private final WebClient webClient;
+    private final RestClient restClient;
     private final String restUrl;
 
     public BinanceRestClient(
-            WebClient webClient,
+            RestClient.Builder restClientBuilder,
             @Value("${exchange.binance.rest-url}") String restUrl) {
-        this.webClient = webClient;
+        this.restClient = restClientBuilder.build();
         this.restUrl = restUrl;
     }
 
-    public Flux<BinanceTickerResponse> fetchUsdtTickers() {
-        return webClient.get()
+    public List<BinanceTickerResponse> fetchUsdtTickers() {
+        BinanceTickerResponse[] responses = restClient.get()
                 .uri(restUrl)
                 .retrieve()
-                .bodyToFlux(BinanceTickerResponse.class)
-                .filter(r -> r.symbol().endsWith("USDT"));
+                .body(BinanceTickerResponse[].class);
+        if (responses == null) {
+            return List.of();
+        }
+        return Arrays.stream(responses)
+                .filter(r -> r.symbol().endsWith("USDT"))
+                .toList();
     }
 }
