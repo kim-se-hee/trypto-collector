@@ -1,13 +1,14 @@
 package ksh.tryptocollector.exchange.upbit;
 
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
+import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
-import ksh.tryptocollector.model.NormalizedTicker;
-import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
-import ksh.tryptocollector.redis.TickerRedisRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
@@ -25,30 +26,17 @@ import java.util.zip.GZIPInputStream;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class UpbitWebSocketHandler implements ExchangeTickerStream {
     private static final int GZIP_BUFFER_SIZE = 1024;
 
     private final ReactorNettyWebSocketClient webSocketClient;
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
-    private final TickerRedisRepository tickerRedisRepository;
-    private final TickerEventPublisher tickerEventPublisher;
-    private final String wsUrl;
+    private final TickerSinkProcessor tickerSinkProcessor;
 
-    public UpbitWebSocketHandler(
-            ReactorNettyWebSocketClient webSocketClient,
-            ObjectMapper objectMapper,
-            MarketInfoCache marketInfoCache,
-            TickerRedisRepository tickerRedisRepository,
-            TickerEventPublisher tickerEventPublisher,
-            @Value("${exchange.upbit.ws-url}") String wsUrl) {
-        this.webSocketClient = webSocketClient;
-        this.objectMapper = objectMapper;
-        this.marketInfoCache = marketInfoCache;
-        this.tickerRedisRepository = tickerRedisRepository;
-        this.tickerEventPublisher = tickerEventPublisher;
-        this.wsUrl = wsUrl;
-    }
+    @Value("${exchange.upbit.ws-url}")
+    private String wsUrl;
 
     @Override
     public Mono<Void> connect() {
@@ -57,7 +45,7 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                     Mono<Void> send = session.send(
                             Mono.just(session.textMessage(subscribeMessage)));
                     Mono<Void> receive = session.receive()
-                            .doOnNext(this::handleMessage)
+                            .flatMap(this::handleMessage)
                             .then();
                     return send.then(receive);
                 })
@@ -75,28 +63,25 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                 objectMapper.writeValueAsString(codes) + "}]";
     }
 
-    private void handleMessage(WebSocketMessage message) {
+    private Mono<Void> handleMessage(WebSocketMessage message) {
         try {
             byte[] payload = extractPayload(message);
             byte[] decompressed = decompressIfNeeded(payload);
             UpbitTickerMessage ticker = objectMapper.readValue(decompressed, UpbitTickerMessage.class);
-            marketInfoCache.find(Exchange.UPBIT, ticker.code())
-                    .ifPresent(meta -> {
-                        NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
-                        Mono.when(
-                                tickerRedisRepository.save(normalized),
-                                tickerEventPublisher.publish(normalized)
-                        ).subscribe();
-                    });
+            return marketInfoCache.find(Exchange.UPBIT, ticker.code())
+                    .map(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())))
+                    .orElse(Mono.empty());
         } catch (Exception e) {
             log.debug("업비트 메시지 처리 실패: {}", e.getMessage());
+            return Mono.empty();
         }
     }
 
     private byte[] extractPayload(WebSocketMessage message) {
-        org.springframework.core.io.buffer.DataBuffer buffer = message.getPayload();
+        DataBuffer buffer = message.getPayload();
         byte[] bytes = new byte[buffer.readableByteCount()];
         buffer.read(bytes);
+        DataBufferUtils.release(buffer);
         return bytes;
     }
 

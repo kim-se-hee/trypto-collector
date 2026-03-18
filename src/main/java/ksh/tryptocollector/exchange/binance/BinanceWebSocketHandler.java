@@ -1,11 +1,10 @@
 package ksh.tryptocollector.exchange.binance;
 
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
+import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
-import ksh.tryptocollector.model.NormalizedTicker;
-import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
-import ksh.tryptocollector.redis.TickerRedisRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,30 +20,17 @@ import java.time.Duration;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class BinanceWebSocketHandler implements ExchangeTickerStream {
     private static final int BOUNDED_CONCURRENCY = 32;
 
     private final ReactorNettyWebSocketClient webSocketClient;
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
-    private final TickerRedisRepository tickerRedisRepository;
-    private final TickerEventPublisher tickerEventPublisher;
-    private final String wsUrl;
+    private final TickerSinkProcessor tickerSinkProcessor;
 
-    public BinanceWebSocketHandler(
-            ReactorNettyWebSocketClient webSocketClient,
-            ObjectMapper objectMapper,
-            MarketInfoCache marketInfoCache,
-            TickerRedisRepository tickerRedisRepository,
-            TickerEventPublisher tickerEventPublisher,
-            @Value("${exchange.binance.ws-url}") String wsUrl) {
-        this.webSocketClient = webSocketClient;
-        this.objectMapper = objectMapper;
-        this.marketInfoCache = marketInfoCache;
-        this.tickerRedisRepository = tickerRedisRepository;
-        this.tickerEventPublisher = tickerEventPublisher;
-        this.wsUrl = wsUrl;
-    }
+    @Value("${exchange.binance.ws-url}")
+    private String wsUrl;
 
     @Override
     public Mono<Void> connect() {
@@ -65,17 +51,12 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
             BinanceTickerMessage[] tickers = objectMapper.readValue(
                     payload, BinanceTickerMessage[].class);
             return Flux.fromArray(tickers)
-                    .flatMap(ticker -> {
-                        return marketInfoCache.find(Exchange.BINANCE, ticker.symbol())
-                                .map(meta -> {
-                                    NormalizedTicker normalized = ticker.toNormalized(meta.displayName());
-                                    return Mono.when(
-                                            tickerRedisRepository.save(normalized),
-                                            tickerEventPublisher.publish(normalized)
-                                    );
-                                })
-                                .orElse(Mono.empty());
-                    }, BOUNDED_CONCURRENCY);
+                    .flatMap(ticker ->
+                            marketInfoCache.find(Exchange.BINANCE, ticker.symbol())
+                                    .map(meta -> tickerSinkProcessor.process(
+                                            ticker.toNormalized(meta.displayName())))
+                                    .orElse(Mono.empty())
+                    , BOUNDED_CONCURRENCY);
         } catch (Exception e) {
             log.debug("바이낸스 메시지 처리 실패: {}", e.getMessage());
             return Flux.empty();
