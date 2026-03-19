@@ -46,7 +46,7 @@ market: "KRW-BTC"
 ### 연결 정보
 
 - **URL:** `wss://ws-api.bithumb.com/websocket/v1`
-- **프레임 유형:** 텍스트 (업비트와 달리 바이너리/gzip이 아님)
+- **프레임 유형:** 바이너리 (gzip 압축 없음)
 - **구독 메시지:** 연결 직후 JSON 배열로 전송
 
 ### 구독 메시지 포맷
@@ -82,10 +82,10 @@ market: "KRW-BTC"
 | 항목 | 업비트 | 빗썸 |
 |------|--------|------|
 | WebSocket URL | `wss://api.upbit.com/websocket/v1` | `wss://ws-api.bithumb.com/websocket/v1` |
-| 프레임 유형 | 바이너리 (gzip 가능) | 텍스트 |
+| 프레임 유형 | 바이너리 (gzip 가능) | 바이너리 (gzip 없음) |
 | 구독 형식 | 동일 | 동일 |
 | 응답 필드 | 동일 | 동일 |
 | 역직렬화 DTO | UpbitTickerMessage | BithumbTickerMessage (동일 구조) |
 
-핵심 차이는 **프레임 유형**뿐이다. 빗썸은 텍스트 프레임이므로 gzip 압축 해제가 필요 없다.
+핵심 차이는 **프레임 유형**뿐이다. 빗썸은 바이너리 프레임이지만 gzip 압축은 없다.
 

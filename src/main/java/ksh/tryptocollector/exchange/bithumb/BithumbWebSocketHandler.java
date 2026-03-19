@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
@@ -81,9 +82,23 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
     private class BithumbListener implements WebSocket.Listener {
         private final CountDownLatch closeLatch;
         private final StringBuilder textBuffer = new StringBuilder();
+        private final java.io.ByteArrayOutputStream binaryBuffer = new java.io.ByteArrayOutputStream();
 
         BithumbListener(CountDownLatch closeLatch) {
             this.closeLatch = closeLatch;
+        }
+
+        @Override
+        public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+            byte[] bytes = new byte[data.remaining()];
+            data.get(bytes);
+            binaryBuffer.write(bytes, 0, bytes.length);
+            if (last) {
+                handleMessage(binaryBuffer.toString(java.nio.charset.StandardCharsets.UTF_8));
+                binaryBuffer.reset();
+            }
+            webSocket.request(1);
+            return null;
         }
 
         @Override
