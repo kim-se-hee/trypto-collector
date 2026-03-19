@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class BinanceRestClient {
         }
         return Arrays.stream(responses)
                 .filter(r -> r.symbol().endsWith("USDT"))
+                .filter(r -> new BigDecimal(r.quoteVolume()).compareTo(BigDecimal.ZERO) > 0)
                 .toList();
     }
 }
