@@ -1,3 +1,6 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: trypto-collector
@@ -14,9 +17,11 @@ spring:
 exchange:
   upbit:
     rest-url: https://api.upbit.com/v1/market/all
+    ticker-url: https://api.upbit.com/v1/ticker
     ws-url: wss://api.upbit.com/websocket/v1
   bithumb:
     rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
+    ticker-url: https://api.bithumb.com/v1/ticker
     ws-url: wss://ws-api.bithumb.com/websocket/v1
   binance:
     rest-url: https://api.binance.com/api/v3/ticker/24hr
