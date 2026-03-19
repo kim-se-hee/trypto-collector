@@ -7,7 +7,6 @@ import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @Component
@@ -17,15 +16,13 @@ public class TickerSinkProcessor {
     private final TickerEventPublisher tickerEventPublisher;
     private final CandleBuffer candleBuffer;
 
-    public Mono<Void> process(NormalizedTicker ticker) {
+    public void process(NormalizedTicker ticker) {
         try {
             candleBuffer.update(ticker);
         } catch (Exception e) {
             log.debug("캔들 버퍼 갱신 실패: {}", e.getMessage());
         }
-        return Mono.when(
-                tickerRedisRepository.save(ticker),
-                tickerEventPublisher.publish(ticker)
-        );
+        tickerRedisRepository.save(ticker);
+        tickerEventPublisher.publish(ticker);
     }
 }

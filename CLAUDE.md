@@ -1,6 +1,6 @@
 # 시스템 프롬프트
 
-너는 Java/Spring WebFlux 기반 시니어 백엔드 엔지니어다. 이 프로젝트는 실시간 시세 수집 파이프라인으로, 외부 거래소 API → 정규화 → Redis 저장 + RabbitMQ 이벤트 발행의 단방향 파이프라인 구조를 따른다. 코드는 유지보수성, 가독성, 반응형 스트림의 올바른 사용을 최우선으로 한다.
+너는 Java/Spring 기반 시니어 백엔드 엔지니어다. 이 프로젝트는 실시간 시세 수집 파이프라인으로, 외부 거래소 API → 정규화 → Redis 저장 + RabbitMQ 이벤트 발행의 단방향 파이프라인 구조를 따른다. 코드는 유지보수성, 가독성, 동기 코드의 단순함을 최우선으로 한다.
 
 ---
 
@@ -15,12 +15,12 @@
 | 분류 | 기술 | 버전 |
 |------|------|------|
 | 언어 | Java | 21 |
-| 프레임워크 | Spring Boot (WebFlux) | 4.0.3 |
+| 프레임워크 | Spring Boot (Web) | 4.0.3 |
 | 빌드 | Gradle | |
-| Redis 클라이언트 | Spring Data Redis Reactive | |
+| Redis 클라이언트 | Spring Data Redis (`StringRedisTemplate`) | |
 | 메시지 브로커 | RabbitMQ (Spring AMQP) | |
-| HTTP 클라이언트 | WebClient (Reactor Netty) | |
-| WebSocket 클라이언트 | ReactorNettyWebSocketClient | |
+| HTTP 클라이언트 | RestClient | |
+| WebSocket 클라이언트 | `java.net.http.HttpClient` + `WebSocket` | |
 | 시계열 DB | InfluxDB (`influxdb-client-java`) | |
 | 유틸리티 | Lombok | |
 | 컨테이너 | Docker Compose | |
@@ -35,7 +35,7 @@
 
 ```
 ksh.tryptocollector/
-├── config/        # 공유 인프라 설정 (WebClient 등)
+├── config/        # 공유 인프라 설정
 ├── model/         # 정규화된 도메인 모델 (enum, record)
 ├── exchange/      # 거래소 공통 인터페이스, WebSocket 오케스트레이터
 │   ├── upbit/     # 업비트 REST + WebSocket + DTO
@@ -46,7 +46,7 @@ ksh.tryptocollector/
 ├── redis/         # 시세 Redis 저장
 └── rabbitmq/      # 시세 이벤트 RabbitMQ 발행
 ```
-
+``
 각 거래소 패키지 내부는 동일한 구조를 따른다.
 
 ```
@@ -69,19 +69,20 @@ ksh.tryptocollector/
 - WebSocket 메시지 DTO: `{거래소}TickerMessage`
 - WebSocket 메시지 DTO에 `toNormalized(String displayName)` 변환 메서드를 둔다
 
-## 반응형 패턴
+## 동기 패턴
 
-- 모든 I/O는 `Mono`/`Flux`로 처리한다. 블로킹 호출 금지
-- `ReactiveRedisTemplate`을 사용한다 (`StringRedisTemplate` 금지)
-- 블로킹 API(`RabbitTemplate` 등)는 `Schedulers.boundedElastic()`에서 실행한다
-- WebSocket 재연결: `retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofSeconds(60)))`
-- Binance 배치 처리 시 `flatMap(..., 32)` bounded concurrency 적용
+- 모든 I/O는 동기 호출로 처리한다. Reactor(`Mono`/`Flux`) 사용 금지
+- Redis: `StringRedisTemplate` 사용
+- REST: `RestClient` 사용 (`RestClient.Builder` 자동 구성 주입)
+- WebSocket: `java.net.http.HttpClient` + `WebSocket` 사용
+- WebSocket 재연결: while 루프 + `Thread.sleep()` 지수 백오프 (최대 60초)
+- 거래소별 WebSocket은 별도 스레드에서 블로킹 실행 (`ExecutorService`)
 
 ## 네이밍
 
 - REST 클라이언트: `{거래소}RestClient` (예: `UpbitRestClient`)
 - WebSocket 핸들러: `{거래소}WebSocketHandler` (예: `UpbitWebSocketHandler`)
-- 인터페이스: `ExchangeTickerStream` — `Mono<Void> connect()` 메서드 정의
+- 인터페이스: `ExchangeTickerStream` — `void connect()` 메서드 정의
 - 캐시: `MarketInfoCache` — `ConcurrentHashMap` 기반 스레드 안전 캐시
 - Redis 저장소: `TickerRedisRepository`
 - `get` vs `find`: `get`은 대상이 반드시 존재한다고 가정하며 없으면 예외를 던진다. `find`는 대상이 없을 수 있으며 `Optional` 또는 빈 컬렉션을 반환한다
@@ -167,3 +168,4 @@ GitHub Flow를 따른다. `main` 브랜치와 `feature/*` 브랜치만 사용한
 - 공통 인프라: `docs/common-infrastructure.md`
 - 거래소별: `docs/upbit.md`, `docs/bithumb.md`, `docs/binance.md`
 - 캔들 데이터 수집: `docs/candle.md`
+- 모니터링: `docs/monitoring.md`

@@ -10,13 +10,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
@@ -44,13 +41,11 @@ class TickerSinkProcessorTest {
                 new BigDecimal("50000000"), BigDecimal.ZERO, BigDecimal.ZERO, System.currentTimeMillis()
         );
         willThrow(new RuntimeException("buffer error")).given(candleBuffer).update(any());
-        given(tickerRedisRepository.save(ticker)).willReturn(Mono.just(true));
-        given(tickerEventPublisher.publish(ticker)).willReturn(Mono.empty());
 
-        // when & then
-        StepVerifier.create(tickerSinkProcessor.process(ticker))
-                .verifyComplete();
+        // when
+        tickerSinkProcessor.process(ticker);
 
+        // then
         verify(tickerRedisRepository).save(ticker);
         verify(tickerEventPublisher).publish(ticker);
     }
