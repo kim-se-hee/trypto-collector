@@ -6,7 +6,7 @@
 
 - **URL:** `GET https://api.binance.com/api/v3/ticker/24hr`
 - **인증:** 불필요 (공개 마켓 데이터)
-- **응답 크기:** 2000+ 심볼을 포함하는 대형 JSON 배열 → WebClient `maxInMemorySize` 5MB 필요
+- **응답 크기:** 2000+ 심볼을 포함하는 대형 JSON 배열
 - **필터:** `symbol`이 `USDT`로 끝나는 항목만 사용
 
 **응답 예시 (단일 항목):**
@@ -134,7 +134,7 @@ ExchangeInitializer.loadBinance():
 
 ### 배열 배치 처리
 
-WebSocket이 ~1초마다 전체 심볼 배열을 전송하므로, Redis 쓰기를 bounded concurrency 32로 처리한다.
+WebSocket이 ~1초마다 전체 심볼 배열을 전송하므로, 배열을 순회하며 동기적으로 처리한다.
 
 ---
 
