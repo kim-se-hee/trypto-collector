@@ -28,7 +28,6 @@ exchange:
     ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr
 
 ticker:
-  redis-ttl-seconds: 30
   redis-key-prefix: ticker
 
 market-meta:
