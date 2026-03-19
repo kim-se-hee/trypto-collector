@@ -35,7 +35,7 @@ market-meta:
 
 influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
-  token: ${INFLUXDB_TOKEN}
+  token: ${INFLUXDB_TOKEN:trypto-collector-token}
   org: ${INFLUXDB_ORG:trypto}
   bucket: ${INFLUXDB_BUCKET:candle}
 
