@@ -4,8 +4,10 @@ import jakarta.annotation.PostConstruct;
 import ksh.tryptocollector.exchange.binance.BinanceRestClient;
 import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
 import ksh.tryptocollector.exchange.bithumb.BithumbRestClient;
+import ksh.tryptocollector.exchange.bithumb.BithumbTickerResponse;
 import ksh.tryptocollector.exchange.bithumb.BithumbWebSocketHandler;
 import ksh.tryptocollector.exchange.upbit.UpbitRestClient;
+import ksh.tryptocollector.exchange.upbit.UpbitTickerResponse;
 import ksh.tryptocollector.exchange.upbit.UpbitWebSocketHandler;
 import ksh.tryptocollector.model.Exchange;
 import ksh.tryptocollector.model.MarketInfo;
@@ -18,7 +20,10 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -65,17 +70,47 @@ public class ExchangeInitializer {
 
     private void loadAndConnectUpbit() {
         List<MarketInfo> infos = upbitRestClient.fetchKrwMarkets();
-        infos.forEach(info -> marketInfoCache.put(Exchange.UPBIT, "KRW-" + info.base(), info));
+        List<String> marketCodes = new ArrayList<>();
+        Map<String, MarketInfo> infoByMarket = new HashMap<>();
+        for (MarketInfo info : infos) {
+            String marketCode = "KRW-" + info.base();
+            marketInfoCache.put(Exchange.UPBIT, marketCode, info);
+            marketCodes.add(marketCode);
+            infoByMarket.put(marketCode, info);
+        }
         log.info("업비트 마켓 메타데이터 로드 완료: {}개", infos.size());
         marketMetadataRedisRepository.save(Exchange.UPBIT, infos);
+
+        List<UpbitTickerResponse> tickers = upbitRestClient.fetchKrwTickers(marketCodes);
+        for (UpbitTickerResponse ticker : tickers) {
+            MarketInfo info = infoByMarket.get(ticker.market());
+            tickerRedisRepository.save(ticker.toNormalized(info.displayName()));
+        }
+        log.info("업비트 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
+
         upbitWebSocketHandler.connect();
     }
 
     private void loadAndConnectBithumb() {
         List<MarketInfo> infos = bithumbRestClient.fetchKrwMarkets();
-        infos.forEach(info -> marketInfoCache.put(Exchange.BITHUMB, "KRW-" + info.base(), info));
+        List<String> marketCodes = new ArrayList<>();
+        Map<String, MarketInfo> infoByMarket = new HashMap<>();
+        for (MarketInfo info : infos) {
+            String marketCode = "KRW-" + info.base();
+            marketInfoCache.put(Exchange.BITHUMB, marketCode, info);
+            marketCodes.add(marketCode);
+            infoByMarket.put(marketCode, info);
+        }
         log.info("빗썸 마켓 메타데이터 로드 완료: {}개", infos.size());
         marketMetadataRedisRepository.save(Exchange.BITHUMB, infos);
+
+        List<BithumbTickerResponse> tickers = bithumbRestClient.fetchKrwTickers(marketCodes);
+        for (BithumbTickerResponse ticker : tickers) {
+            MarketInfo info = infoByMarket.get(ticker.market());
+            tickerRedisRepository.save(ticker.toNormalized(info.displayName()));
+        }
+        log.info("빗썸 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
+
         bithumbWebSocketHandler.connect();
     }
 
