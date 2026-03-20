@@ -1,10 +1,11 @@
 package ksh.tryptocollector.exchange.upbit;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -24,14 +25,25 @@ import java.util.zip.GZIPInputStream;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class UpbitWebSocketHandler implements ExchangeTickerStream {
     private static final int GZIP_BUFFER_SIZE = 1024;
     private static final long MAX_BACKOFF_SECONDS = 60;
 
+    private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerSinkProcessor tickerSinkProcessor;
+    private final Counter reconnectCounter;
+
+    public UpbitWebSocketHandler(ObjectMapper objectMapper, MarketInfoCache marketInfoCache,
+                                 TickerSinkProcessor tickerSinkProcessor, MeterRegistry registry) {
+        this.objectMapper = objectMapper;
+        this.marketInfoCache = marketInfoCache;
+        this.tickerSinkProcessor = tickerSinkProcessor;
+        this.reconnectCounter = Counter.builder("websocket.reconnect")
+                .tag("exchange", Exchange.UPBIT.name())
+                .register(registry);
+    }
 
     @Value("${exchange.upbit.ws-url}")
     private String wsUrl;
@@ -42,7 +54,6 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 CountDownLatch closeLatch = new CountDownLatch(1);
-                HttpClient httpClient = HttpClient.newHttpClient();
                 WebSocket ws = httpClient.newWebSocketBuilder()
                         .buildAsync(URI.create(wsUrl), new UpbitListener(closeLatch))
                         .join();
@@ -52,9 +63,10 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                 retryCount = 0;
                 closeLatch.await();
             } catch (Exception e) {
+                reconnectCounter.increment();
                 log.warn("업비트 WebSocket 연결 끊김, 재연결 시도 #{}", retryCount + 1, e);
+                backoff(retryCount++);
             }
-            backoff(retryCount++);
         }
     }
 

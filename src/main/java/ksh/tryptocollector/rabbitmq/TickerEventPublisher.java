@@ -1,7 +1,9 @@
 package ksh.tryptocollector.rabbitmq;
 
+import io.micrometer.core.annotation.Timed;
 import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.model.TickerEvent;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
@@ -13,16 +15,13 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TickerEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
 
-    public TickerEventPublisher(RabbitTemplate rabbitTemplate, ObjectMapper objectMapper) {
-        this.rabbitTemplate = rabbitTemplate;
-        this.objectMapper = objectMapper;
-    }
-
+    @Timed(value = "rabbitmq.publish.time")
     public void publish(NormalizedTicker ticker) {
         try {
             TickerEvent event = TickerEvent.from(ticker);
