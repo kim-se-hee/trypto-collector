@@ -42,6 +42,14 @@ influxdb:
   org: ${INFLUXDB_ORG:trypto}
   bucket: ${INFLUXDB_BUCKET:candle}
 
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+
 logging:
   level:
     ksh.tryptocollector: DEBUG
