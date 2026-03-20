@@ -75,6 +75,7 @@ public class CandleBackfillService {
             } catch (Exception e) {
                 log.warn("{} {} 갭 복구 실패: {}", exchange, symbolCode, e.getMessage());
             }
+            sleep(REQUEST_INTERVAL_MS);
         }
 
         log.info("{} 갭 복구 완료: 총 {}건", exchange, totalCandles);
