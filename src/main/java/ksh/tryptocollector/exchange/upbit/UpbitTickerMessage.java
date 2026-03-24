@@ -21,7 +21,7 @@ public record UpbitTickerMessage(
                 tradePrice,
                 signedChangeRate,
                 accTradePrice24h,
-                System.currentTimeMillis()
+                timestamp
         );
     }
 }

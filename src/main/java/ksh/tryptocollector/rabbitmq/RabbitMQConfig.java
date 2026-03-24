@@ -1,7 +1,10 @@
 package ksh.tryptocollector.rabbitmq;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.FanoutExchange;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,11 +21,15 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public RabbitTemplate rabbitTemplate(
-            org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory) {
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MeterRegistry registry) {
+        Counter nackCounter = Counter.builder("rabbitmq.nack.count")
+                .description("브로커 메시지 수신 거부 횟수")
+                .register(registry);
+
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setConfirmCallback((correlationData, ack, cause) -> {
             if (!ack) {
+                nackCounter.increment();
                 log.warn("시세 이벤트 발행 nack: {}", cause);
             }
         });

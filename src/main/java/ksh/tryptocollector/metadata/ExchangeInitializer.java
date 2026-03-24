@@ -1,6 +1,9 @@
 package ksh.tryptocollector.metadata;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import ksh.tryptocollector.candle.CandleBackfillService;
 import ksh.tryptocollector.exchange.binance.BinanceRestClient;
 import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
@@ -43,17 +46,27 @@ public class ExchangeInitializer {
     private final BithumbWebSocketHandler bithumbWebSocketHandler;
     private final BinanceWebSocketHandler binanceWebSocketHandler;
     private final CandleBackfillService candleBackfillService;
+    private final MeterRegistry meterRegistry;
 
     private static final long MAX_BACKOFF_SECONDS = 60;
     private static final int CHANGE_RATE_SCALE = 8;
     private static final int THREAD_POOL_SIZE = 3;
+    private static final String EXECUTOR_METRIC_NAME = "exchange.initializer";
+
+    private ExecutorService exchangeThreadPool;
 
     @PostConstruct
     void init() {
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-        executor.submit(() -> initWithRetry("업비트", this::loadAndConnectUpbit));
-        executor.submit(() -> initWithRetry("빗썸", this::loadAndConnectBithumb));
-        executor.submit(() -> initWithRetry("바이낸스", this::loadAndConnectBinance));
+        exchangeThreadPool = ExecutorServiceMetrics.monitor(
+                meterRegistry, Executors.newFixedThreadPool(THREAD_POOL_SIZE), EXECUTOR_METRIC_NAME);
+        exchangeThreadPool.submit(() -> initWithRetry("업비트", this::loadAndConnectUpbit));
+        exchangeThreadPool.submit(() -> initWithRetry("빗썸", this::loadAndConnectBithumb));
+        exchangeThreadPool.submit(() -> initWithRetry("바이낸스", this::loadAndConnectBinance));
+    }
+
+    @PreDestroy
+    void shutdown() {
+        exchangeThreadPool.shutdownNow();
     }
 
     private void initWithRetry(String exchangeName, Runnable task) {

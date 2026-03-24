@@ -31,7 +31,7 @@ public record BinanceTickerMessage(
                 close,
                 changeRate,
                 new BigDecimal(quoteVolume),
-                System.currentTimeMillis()
+                eventTime
         );
     }
 }

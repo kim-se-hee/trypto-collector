@@ -1,5 +1,6 @@
 package ksh.tryptocollector.redis;
 
+import io.micrometer.core.annotation.Timed;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import ksh.tryptocollector.model.NormalizedTicker;
@@ -25,6 +26,7 @@ public class TickerRedisRepository {
         this.keyPrefix = keyPrefix;
     }
 
+    @Timed(value = "redis.write.time")
     public void save(NormalizedTicker ticker) {
         String key = buildKey(ticker);
         String json;

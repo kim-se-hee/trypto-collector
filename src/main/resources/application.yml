@@ -42,6 +42,20 @@ influxdb:
   org: ${INFLUXDB_ORG:trypto}
   bucket: ${INFLUXDB_BUCKET:candle}
 
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        ticker.latency: true
+        redis.write.time: true
+        candle.flush.duration: true
+
 logging:
   level:
     ksh.tryptocollector: DEBUG

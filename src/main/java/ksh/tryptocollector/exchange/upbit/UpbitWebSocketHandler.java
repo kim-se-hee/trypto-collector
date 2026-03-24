@@ -1,10 +1,11 @@
 package ksh.tryptocollector.exchange.upbit;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -24,14 +25,29 @@ import java.util.zip.GZIPInputStream;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class UpbitWebSocketHandler implements ExchangeTickerStream {
     private static final int GZIP_BUFFER_SIZE = 1024;
     private static final long MAX_BACKOFF_SECONDS = 60;
 
+    private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerSinkProcessor tickerSinkProcessor;
+    private final Counter reconnectCounter;
+    private final Counter parseFailureCounter;
+
+    public UpbitWebSocketHandler(ObjectMapper objectMapper, MarketInfoCache marketInfoCache,
+                                 TickerSinkProcessor tickerSinkProcessor, MeterRegistry registry) {
+        this.objectMapper = objectMapper;
+        this.marketInfoCache = marketInfoCache;
+        this.tickerSinkProcessor = tickerSinkProcessor;
+        this.reconnectCounter = Counter.builder("websocket.reconnect")
+                .tag("exchange", Exchange.UPBIT.name())
+                .register(registry);
+        this.parseFailureCounter = Counter.builder("ticker.parse.failure")
+                .tag("exchange", Exchange.UPBIT.name())
+                .register(registry);
+    }
 
     @Value("${exchange.upbit.ws-url}")
     private String wsUrl;
@@ -42,7 +58,6 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 CountDownLatch closeLatch = new CountDownLatch(1);
-                HttpClient httpClient = HttpClient.newHttpClient();
                 WebSocket ws = httpClient.newWebSocketBuilder()
                         .buildAsync(URI.create(wsUrl), new UpbitListener(closeLatch))
                         .join();
@@ -52,9 +67,10 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                 retryCount = 0;
                 closeLatch.await();
             } catch (Exception e) {
+                reconnectCounter.increment();
                 log.warn("업비트 WebSocket 연결 끊김, 재연결 시도 #{}", retryCount + 1, e);
+                backoff(retryCount++);
             }
-            backoff(retryCount++);
         }
     }
 
@@ -65,13 +81,14 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                 objectMapper.writeValueAsString(codes) + "}]";
     }
 
-    private void handleMessage(byte[] payload) {
+    private void handleMessage(byte[] payload, long receivedAtNanos) {
         try {
             byte[] decompressed = decompressIfNeeded(payload);
             UpbitTickerMessage ticker = objectMapper.readValue(decompressed, UpbitTickerMessage.class);
             marketInfoCache.find(Exchange.UPBIT, ticker.code())
-                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())));
+                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName()), receivedAtNanos));
         } catch (Exception e) {
+            parseFailureCounter.increment();
             log.debug("업비트 메시지 처리 실패: {}", e.getMessage());
         }
     }
@@ -118,9 +135,10 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
             data.get(bytes);
             binaryBuffer.write(bytes, 0, bytes.length);
             if (last) {
+                long receivedAtNanos = System.nanoTime();
                 byte[] payload = binaryBuffer.toByteArray();
                 binaryBuffer.reset();
-                handleMessage(payload);
+                handleMessage(payload, receivedAtNanos);
             }
             webSocket.request(1);
             return null;
@@ -128,7 +146,7 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            handleMessage(data.toString().getBytes());
+            handleMessage(data.toString().getBytes(), System.nanoTime());
             webSocket.request(1);
             return null;
         }

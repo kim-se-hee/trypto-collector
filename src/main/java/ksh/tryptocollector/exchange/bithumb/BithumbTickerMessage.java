@@ -21,7 +21,7 @@ public record BithumbTickerMessage(
                 tradePrice,
                 signedChangeRate,
                 accTradePrice24h,
-                System.currentTimeMillis()
+                timestamp
         );
     }
 }

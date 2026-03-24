@@ -48,6 +48,7 @@ services:
     build: .
     ports:
       - "8081:8080"
+      - "9090:9090"
     depends_on:
       redis:
         condition: service_healthy
@@ -60,8 +61,32 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: trypto-collector-token
+      MANAGEMENT_PORT: 9090
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
 
 volumes:
   redis-data:
   rabbitmq-data:
   influxdb-data:
+  prometheus-data:
+  grafana-data:

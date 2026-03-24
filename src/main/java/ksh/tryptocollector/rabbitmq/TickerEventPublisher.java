@@ -1,7 +1,10 @@
 package ksh.tryptocollector.rabbitmq;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.model.TickerEvent;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
@@ -13,15 +16,12 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class TickerEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
-
-    public TickerEventPublisher(RabbitTemplate rabbitTemplate, ObjectMapper objectMapper) {
-        this.rabbitTemplate = rabbitTemplate;
-        this.objectMapper = objectMapper;
-    }
+    private final MeterRegistry meterRegistry;
 
     public void publish(NormalizedTicker ticker) {
         try {
@@ -37,6 +37,10 @@ public class TickerEventPublisher {
                     .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                     .build();
             rabbitTemplate.send(RabbitMQConfig.TICKER_EXCHANGE, "", message);
+            Counter.builder("rabbitmq.publish")
+                    .tag("exchange", ticker.exchange())
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("시세 이벤트 발행 실패: {}/{}", ticker.exchange(),
                     ticker.base() + "/" + ticker.quote(), e);
