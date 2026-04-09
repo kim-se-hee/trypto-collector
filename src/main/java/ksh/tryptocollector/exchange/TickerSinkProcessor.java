@@ -2,6 +2,7 @@ package ksh.tryptocollector.exchange;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.candle.CandleBuffer;
+import ksh.tryptocollector.matching.PendingOrderMatcher;
 import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
@@ -18,6 +19,7 @@ public class TickerSinkProcessor {
     private final TickerRedisRepository tickerRedisRepository;
     private final TickerEventPublisher tickerEventPublisher;
     private final CandleBuffer candleBuffer;
+    private final PendingOrderMatcher pendingOrderMatcher;
     private final MeterRegistry registry;
 
     public void process(NormalizedTicker ticker, long receivedAtNanos) {
@@ -35,6 +37,11 @@ public class TickerSinkProcessor {
             tickerEventPublisher.publish(ticker);
         } catch (Exception e) {
             log.error("RabbitMQ 발행 실패: {}/{}", ticker.exchange(), ticker.base(), e);
+        }
+        try {
+            pendingOrderMatcher.match(ticker);
+        } catch (Exception e) {
+            log.error("주문 매칭 실패: {}/{}", ticker.exchange(), ticker.base(), e);
         }
 
         long elapsed = System.nanoTime() - receivedAtNanos;
