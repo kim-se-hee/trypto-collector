@@ -1,13 +1,10 @@
 package ksh.tryptocollector;
 
 import com.influxdb.client.InfluxDBClient;
-import com.influxdb.client.QueryApi;
 import com.influxdb.client.WriteApiBlocking;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import ksh.tryptocollector.candle.CandleBuffer;
-import ksh.tryptocollector.candle.CandleFlushScheduler;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.ExchangeInitializer;
 import ksh.tryptocollector.model.NormalizedTicker;
@@ -25,8 +22,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.BDDMockito.willThrow;
 
 @SpringBootTest
 @Testcontainers
@@ -56,17 +51,8 @@ class MetricsIntegrationTest {
     @MockitoBean
     WriteApiBlocking writeApiBlocking;
 
-    @MockitoBean
-    QueryApi queryApi;
-
     @Autowired
     TickerSinkProcessor sinkProcessor;
-
-    @Autowired
-    CandleBuffer candleBuffer;
-
-    @Autowired
-    CandleFlushScheduler candleFlushScheduler;
 
     @Autowired
     MeterRegistry registry;
@@ -81,7 +67,7 @@ class MetricsIntegrationTest {
 
     @Test
     void 시세_처리시_파이프라인_메트릭이_기록된다() {
-        sinkProcessor.process(createTicker());
+        sinkProcessor.process(createTicker(), System.nanoTime());
 
         Timer latency = registry.find("ticker.latency").tag("exchange", "UPBIT").timer();
         assertThat(latency).isNotNull();
@@ -94,30 +80,6 @@ class MetricsIntegrationTest {
         Counter rabbitPublish = registry.find("rabbitmq.publish").tag("exchange", "UPBIT").counter();
         assertThat(rabbitPublish).isNotNull();
         assertThat(rabbitPublish.count()).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
-    void 캔들_플러시시_타이머가_기록된다() {
-        candleBuffer.update(createTicker());
-
-        candleFlushScheduler.flush();
-
-        Timer flushTimer = registry.find("candle.flush.duration").timer();
-        assertThat(flushTimer).isNotNull();
-        assertThat(flushTimer.count()).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
-    void 캔들_플러시_실패시_실패_카운터가_증가한다() {
-        candleBuffer.update(createTicker());
-        willThrow(new RuntimeException("write error")).given(writeApiBlocking).writePoints(anyList());
-
-        Counter failureCounter = registry.find("candle.flush.failure").counter();
-        double before = failureCounter.count();
-
-        candleFlushScheduler.flush();
-
-        assertThat(failureCounter.count() - before).isEqualTo(1.0);
     }
 
     @Test

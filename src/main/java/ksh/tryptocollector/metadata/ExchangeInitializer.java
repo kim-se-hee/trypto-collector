@@ -4,7 +4,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import ksh.tryptocollector.candle.CandleBackfillService;
 import ksh.tryptocollector.exchange.binance.BinanceRestClient;
 import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
 import ksh.tryptocollector.exchange.bithumb.BithumbRestClient;
@@ -45,7 +44,6 @@ public class ExchangeInitializer {
     private final UpbitWebSocketHandler upbitWebSocketHandler;
     private final BithumbWebSocketHandler bithumbWebSocketHandler;
     private final BinanceWebSocketHandler binanceWebSocketHandler;
-    private final CandleBackfillService candleBackfillService;
     private final MeterRegistry meterRegistry;
 
     private static final long MAX_BACKOFF_SECONDS = 60;
@@ -103,7 +101,6 @@ public class ExchangeInitializer {
         }
         log.info("업비트 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
 
-        startBackfillThread(Exchange.UPBIT);
         upbitWebSocketHandler.connect();
     }
 
@@ -127,7 +124,6 @@ public class ExchangeInitializer {
         }
         log.info("빗썸 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
 
-        startBackfillThread(Exchange.BITHUMB);
         bithumbWebSocketHandler.connect();
     }
 
@@ -153,18 +149,7 @@ public class ExchangeInitializer {
         log.info("바이낸스 마켓 메타데이터 로드 및 초기 스냅샷 저장 완료");
         marketMetadataRedisRepository.save(Exchange.BINANCE, marketInfoCache.getMarketInfos(Exchange.BINANCE));
 
-        startBackfillThread(Exchange.BINANCE);
         binanceWebSocketHandler.connect();
-    }
-
-    private void startBackfillThread(Exchange exchange) {
-        new Thread(() -> {
-            try {
-                candleBackfillService.backfill(exchange);
-            } catch (Exception e) {
-                log.warn("{} 캔들 갭 복구 실패: {}", exchange, e.getMessage());
-            }
-        }, "backfill-" + exchange.name().toLowerCase()).start();
     }
 
     private void backoff(int retryCount) {

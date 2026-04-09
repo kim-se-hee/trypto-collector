@@ -1,11 +1,11 @@
 package ksh.tryptocollector.exchange;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import ksh.tryptocollector.candle.CandleBuffer;
 import ksh.tryptocollector.matching.PendingOrderMatcher;
 import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
+import ksh.tryptocollector.tick.TickRawWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,15 +18,15 @@ import java.util.concurrent.TimeUnit;
 public class TickerSinkProcessor {
     private final TickerRedisRepository tickerRedisRepository;
     private final TickerEventPublisher tickerEventPublisher;
-    private final CandleBuffer candleBuffer;
+    private final TickRawWriter tickRawWriter;
     private final PendingOrderMatcher pendingOrderMatcher;
     private final MeterRegistry registry;
 
     public void process(NormalizedTicker ticker, long receivedAtNanos) {
         try {
-            candleBuffer.update(ticker);
+            tickRawWriter.write(ticker);
         } catch (Exception e) {
-            log.debug("캔들 버퍼 갱신 실패: {}", e.getMessage());
+            log.debug("InfluxDB raw tick 저장 실패: {}", e.getMessage());
         }
         try {
             tickerRedisRepository.save(ticker);

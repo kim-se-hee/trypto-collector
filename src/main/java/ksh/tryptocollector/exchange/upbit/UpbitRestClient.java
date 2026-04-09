@@ -14,17 +14,14 @@ public class UpbitRestClient {
     private final RestClient restClient;
     private final String restUrl;
     private final String tickerUrl;
-    private final String candleUrl;
 
     public UpbitRestClient(
             RestClient.Builder restClientBuilder,
             @Value("${exchange.upbit.rest-url}") String restUrl,
-            @Value("${exchange.upbit.ticker-url}") String tickerUrl,
-            @Value("${exchange.upbit.candle-url}") String candleUrl) {
+            @Value("${exchange.upbit.ticker-url}") String tickerUrl) {
         this.restClient = restClientBuilder.build();
         this.restUrl = restUrl;
         this.tickerUrl = tickerUrl;
-        this.candleUrl = candleUrl;
     }
 
     public List<MarketInfo> fetchKrwMarkets() {
@@ -42,21 +39,6 @@ public class UpbitRestClient {
                     return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
                 })
                 .toList();
-    }
-
-    public List<UpbitCandleResponse> fetchMinuteCandles(String market, String to, int count) {
-        String url = candleUrl + "?market=" + market + "&count=" + count;
-        if (to != null) {
-            url += "&to=" + to;
-        }
-        UpbitCandleResponse[] responses = restClient.get()
-                .uri(url)
-                .retrieve()
-                .body(UpbitCandleResponse[].class);
-        if (responses == null) {
-            return List.of();
-        }
-        return Arrays.asList(responses);
     }
 
     public List<UpbitTickerResponse> fetchKrwTickers(List<String> marketCodes) {

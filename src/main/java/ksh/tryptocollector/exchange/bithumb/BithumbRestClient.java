@@ -14,17 +14,14 @@ public class BithumbRestClient {
     private final RestClient restClient;
     private final String restUrl;
     private final String tickerUrl;
-    private final String candleUrl;
 
     public BithumbRestClient(
             RestClient.Builder restClientBuilder,
             @Value("${exchange.bithumb.rest-url}") String restUrl,
-            @Value("${exchange.bithumb.ticker-url}") String tickerUrl,
-            @Value("${exchange.bithumb.candle-url}") String candleUrl) {
+            @Value("${exchange.bithumb.ticker-url}") String tickerUrl) {
         this.restClient = restClientBuilder.build();
         this.restUrl = restUrl;
         this.tickerUrl = tickerUrl;
-        this.candleUrl = candleUrl;
     }
 
     public List<MarketInfo> fetchKrwMarkets() {
@@ -42,14 +39,6 @@ public class BithumbRestClient {
                     return new MarketInfo(base, "KRW", base + "/KRW", r.koreanName());
                 })
                 .toList();
-    }
-
-    public BithumbCandleResponse fetchMinuteCandles(String base) {
-        String url = candleUrl + "/" + base + "_KRW/1m";
-        return restClient.get()
-                .uri(url)
-                .retrieve()
-                .body(BithumbCandleResponse.class);
     }
 
     public List<BithumbTickerResponse> fetchKrwTickers(List<String> marketCodes) {
