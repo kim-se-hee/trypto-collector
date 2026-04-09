@@ -27,6 +27,11 @@ public class PendingOrderRedisRepository {
                 .rangeByScore(key, Double.NEGATIVE_INFINITY, currentPrice.doubleValue());
     }
 
+    public void add(String exchange, String symbol, String side, String orderId, double price) {
+        String key = buildKey(exchange, symbol, side);
+        redisTemplate.opsForZSet().add(key, orderId, price);
+    }
+
     public void remove(String exchange, String symbol, String side, String orderId) {
         String key = buildKey(exchange, symbol, side);
         redisTemplate.opsForZSet().remove(key, orderId);
