@@ -1,12 +1,165 @@
 services:
-  redis:
+  redis-master:
     image: redis:7-alpine
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --replica-announce-ip
+      - host.docker.internal
+      - --replica-announce-port
+      - "6379"
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - redis-master-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-replica-1:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --replicaof
+      - redis-master
+      - "6379"
+      - --replica-announce-ip
+      - host.docker.internal
+      - --replica-announce-port
+      - "6380"
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-replica-1-data:/data
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-replica-2:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --replicaof
+      - redis-master
+      - "6379"
+      - --replica-announce-ip
+      - host.docker.internal
+      - --replica-announce-port
+      - "6381"
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-replica-2-data:/data
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26379:26379"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - sh
+      - -c
+      - |
+        cat > /tmp/sentinel.conf <<'EOF'
+        port 26379
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
+        sentinel announce-ip host.docker.internal
+        sentinel announce-port 26379
+        sentinel monitor mymaster host.docker.internal 6379 2
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        EOF
+        exec redis-sentinel /tmp/sentinel.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26380:26380"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - sh
+      - -c
+      - |
+        cat > /tmp/sentinel.conf <<'EOF'
+        port 26380
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
+        sentinel announce-ip host.docker.internal
+        sentinel announce-port 26380
+        sentinel monitor mymaster host.docker.internal 6379 2
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        EOF
+        exec redis-sentinel /tmp/sentinel.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26380", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26381:26381"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - sh
+      - -c
+      - |
+        cat > /tmp/sentinel.conf <<'EOF'
+        port 26381
+        sentinel resolve-hostnames yes
+        sentinel announce-hostnames yes
+        sentinel announce-ip host.docker.internal
+        sentinel announce-port 26381
+        sentinel monitor mymaster host.docker.internal 6379 2
+        sentinel down-after-milliseconds mymaster 5000
+        sentinel failover-timeout mymaster 10000
+        sentinel parallel-syncs mymaster 1
+        EOF
+        exec redis-sentinel /tmp/sentinel.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26381", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -50,14 +203,21 @@ services:
       - "8081:8080"
       - "9090:9090"
     depends_on:
-      redis:
+      redis-sentinel-1:
+        condition: service_healthy
+      redis-sentinel-2:
+        condition: service_healthy
+      redis-sentinel-3:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       influxdb:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_SENTINEL_MASTER: mymaster
+      SPRING_DATA_REDIS_SENTINEL_NODES: redis-sentinel-1:26379,redis-sentinel-2:26380,redis-sentinel-3:26381
       SPRING_RABBITMQ_HOST: rabbitmq
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: trypto-collector-token
@@ -85,7 +245,9 @@ services:
       - prometheus
 
 volumes:
-  redis-data:
+  redis-master-data:
+  redis-replica-1-data:
+  redis-replica-2-data:
   rabbitmq-data:
   influxdb-data:
   prometheus-data:
