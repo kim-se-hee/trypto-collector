@@ -1,5 +1,6 @@
 package ksh.tryptocollector.matching;
 
+import ksh.tryptocollector.config.LeaderElection;
 import ksh.tryptocollector.model.Exchange;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,9 +22,13 @@ public class CompensationScheduler {
     private final PendingOrderRedisRepository pendingOrderRedisRepository;
     private final MatchedOrderPublisher matchedOrderPublisher;
     private final TickRawRepository tickRawRepository;
+    private final LeaderElection leaderElection;
 
     @Scheduled(fixedDelay = SCHEDULE_DELAY_MS)
     public void compensate() {
+        if (!leaderElection.isLeader()) {
+            return;
+        }
         List<PendingOrder> orders = pendingOrderDbRepository.findAllPendingOrders();
 
         if (orders.isEmpty()) return;
