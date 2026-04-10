@@ -67,6 +67,10 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
                 retryCount = 0;
                 closeLatch.await();
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted() || e instanceof InterruptedException) {
+                    log.info("빗썸 WebSocket 스레드 종료");
+                    return;
+                }
                 reconnectCounter.increment();
                 log.warn("빗썸 WebSocket 연결 끊김, 재연결 시도 #{}", retryCount + 1, e);
                 restPollingFallback.start(Exchange.BITHUMB);
