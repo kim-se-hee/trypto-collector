@@ -2,7 +2,6 @@ package ksh.tryptocollector.metadata;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import ksh.tryptocollector.exchange.binance.BinanceRestClient;
 import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
@@ -53,8 +52,10 @@ public class ExchangeInitializer {
 
     private ExecutorService exchangeThreadPool;
 
-    @PostConstruct
-    void init() {
+    public void start() {
+        if (exchangeThreadPool != null) {
+            return;
+        }
         exchangeThreadPool = ExecutorServiceMetrics.monitor(
                 meterRegistry, Executors.newFixedThreadPool(THREAD_POOL_SIZE), EXECUTOR_METRIC_NAME);
         exchangeThreadPool.submit(() -> initWithRetry("업비트", this::loadAndConnectUpbit));
@@ -62,9 +63,17 @@ public class ExchangeInitializer {
         exchangeThreadPool.submit(() -> initWithRetry("바이낸스", this::loadAndConnectBinance));
     }
 
+    public void stop() {
+        if (exchangeThreadPool == null) {
+            return;
+        }
+        exchangeThreadPool.shutdownNow();
+        exchangeThreadPool = null;
+    }
+
     @PreDestroy
     void shutdown() {
-        exchangeThreadPool.shutdownNow();
+        stop();
     }
 
     private void initWithRetry(String exchangeName, Runnable task) {
