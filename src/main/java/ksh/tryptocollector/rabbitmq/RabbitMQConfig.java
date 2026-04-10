@@ -22,6 +22,8 @@ public class RabbitMQConfig {
     public static final String MATCHED_ORDERS_EXCHANGE = "matched.orders";
     public static final String MATCHED_ORDERS_QUEUE = "matched.orders";
     public static final String MATCHED_ORDERS_ROUTING_KEY = "matched.orders";
+    public static final String MATCHED_ORDERS_DLX = "matched.orders.dlx";
+    public static final String MATCHED_ORDERS_DLQ = "matched.orders.dlq";
 
     @Bean
     public FanoutExchange tickerExchange() {
@@ -35,7 +37,11 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue matchedOrdersQueue() {
-        return QueueBuilder.durable(MATCHED_ORDERS_QUEUE).build();
+        return QueueBuilder.durable(MATCHED_ORDERS_QUEUE)
+                .quorum()
+                .deadLetterExchange(MATCHED_ORDERS_DLX)
+                .deadLetterRoutingKey(MATCHED_ORDERS_DLQ)
+                .build();
     }
 
     @Bean
