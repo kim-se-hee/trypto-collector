@@ -31,6 +31,7 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
     implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.3.0'
     implementation 'io.github.resilience4j:resilience4j-micrometer:2.3.0'
+    implementation 'org.redisson:redisson:3.37.0'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
