@@ -1,55 +1,36 @@
 package ksh.tryptocollector;
 
-import com.influxdb.client.InfluxDBClient;
-import com.influxdb.client.WriteApiBlocking;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
+import ksh.tryptocollector.matching.CompensationScheduler;
 import ksh.tryptocollector.metadata.ExchangeInitializer;
 import ksh.tryptocollector.model.NormalizedTicker;
+import ksh.tryptocollector.support.TestContainerConfiguration;
+import ksh.tryptocollector.support.TestInfluxConfig;
+import ksh.tryptocollector.support.TestRedissonConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.RabbitMQContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Testcontainers
+@ActiveProfiles("test")
+@Import({TestContainerConfiguration.class, TestRedissonConfig.class, TestInfluxConfig.class})
 class MetricsIntegrationTest {
-
-    @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
-
-    @Container
-    static RabbitMQContainer rabbitmq = new RabbitMQContainer("rabbitmq:4-alpine");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
-        registry.add("spring.rabbitmq.host", rabbitmq::getHost);
-        registry.add("spring.rabbitmq.port", rabbitmq::getAmqpPort);
-    }
 
     @MockitoBean
     ExchangeInitializer exchangeInitializer;
 
     @MockitoBean
-    InfluxDBClient influxDBClient;
-
-    @MockitoBean
-    WriteApiBlocking writeApiBlocking;
+    CompensationScheduler compensationScheduler;
 
     @Autowired
     TickerSinkProcessor sinkProcessor;

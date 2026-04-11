@@ -1,5 +1,7 @@
 package ksh.tryptocollector.exchange;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import ksh.tryptocollector.matching.PendingOrderMatcher;
 import ksh.tryptocollector.model.NormalizedTicker;
@@ -38,9 +40,10 @@ class TickerSinkProcessorTest {
 
     @BeforeEach
     void setUp() {
+        CircuitBreaker circuitBreaker = CircuitBreakerRegistry.ofDefaults().circuitBreaker("redis");
         tickerSinkProcessor = new TickerSinkProcessor(
                 tickerRedisRepository, tickerEventPublisher, tickRawWriter,
-                pendingOrderMatcher, new SimpleMeterRegistry());
+                pendingOrderMatcher, circuitBreaker, new SimpleMeterRegistry());
     }
 
     @Test
