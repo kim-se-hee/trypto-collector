@@ -1,12 +1,13 @@
 package ksh.tryptocollector.config;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.Executors;
@@ -32,7 +33,11 @@ public class LeaderElection {
     private RLock lock;
     private volatile boolean leader = false;
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
+    void onApplicationReady() {
+        start();
+    }
+
     void start() {
         lock = redissonClient.getLock(LEADER_LOCK_KEY);
         scheduler = Executors.newSingleThreadScheduledExecutor(
