@@ -22,8 +22,12 @@ public class RabbitMQConfig {
     public static final String MATCHED_ORDERS_EXCHANGE = "matched.orders";
     public static final String MATCHED_ORDERS_QUEUE = "matched.orders";
     public static final String MATCHED_ORDERS_ROUTING_KEY = "matched.orders";
+    public static final String MATCHED_ORDERS_RETRY_QUEUE = "matched.orders.retry";
     public static final String MATCHED_ORDERS_DLX = "matched.orders.dlx";
     public static final String MATCHED_ORDERS_DLQ = "matched.orders.dlq";
+
+    private static final String X_DELIVERY_LIMIT = "x-delivery-limit";
+    private static final int DELIVERY_LIMIT = 2;
 
     @Bean
     public FanoutExchange tickerExchange() {
@@ -39,6 +43,7 @@ public class RabbitMQConfig {
     public Queue matchedOrdersQueue() {
         return QueueBuilder.durable(MATCHED_ORDERS_QUEUE)
                 .quorum()
+                .withArgument(X_DELIVERY_LIMIT, DELIVERY_LIMIT)
                 .deadLetterExchange(MATCHED_ORDERS_DLX)
                 .deadLetterRoutingKey(MATCHED_ORDERS_DLQ)
                 .build();
@@ -49,6 +54,33 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(matchedOrdersQueue)
                 .to(matchedOrdersExchange)
                 .with(MATCHED_ORDERS_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue matchedOrdersRetryQueue() {
+        return QueueBuilder.durable(MATCHED_ORDERS_RETRY_QUEUE)
+                .quorum()
+                .withArgument(X_DELIVERY_LIMIT, DELIVERY_LIMIT)
+                .deadLetterExchange(MATCHED_ORDERS_DLX)
+                .deadLetterRoutingKey(MATCHED_ORDERS_DLQ)
+                .build();
+    }
+
+    @Bean
+    public FanoutExchange matchedOrdersDlx() {
+        return new FanoutExchange(MATCHED_ORDERS_DLX);
+    }
+
+    @Bean
+    public Queue matchedOrdersDlq() {
+        return QueueBuilder.durable(MATCHED_ORDERS_DLQ)
+                .quorum()
+                .build();
+    }
+
+    @Bean
+    public Binding matchedOrdersDlqBinding(Queue matchedOrdersDlq, FanoutExchange matchedOrdersDlx) {
+        return BindingBuilder.bind(matchedOrdersDlq).to(matchedOrdersDlx);
     }
 
     @Bean
