@@ -5,14 +5,12 @@ services:
       - redis-server
       - --port
       - "6379"
-      - --replica-announce-ip
-      - host.docker.internal
-      - --replica-announce-port
-      - "6379"
     ports:
       - "6379:6379"
     volumes:
       - redis-master-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,6 +34,8 @@ services:
       - "6380:6379"
     volumes:
       - redis-replica-1-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis-master:
         condition: service_healthy
@@ -62,6 +62,8 @@ services:
       - "6381:6379"
     volumes:
       - redis-replica-2-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis-master:
         condition: service_healthy
@@ -78,13 +80,16 @@ services:
         condition: service_healthy
     ports:
       - "26379:26379"
+    volumes:
+      - redis-sentinel-1-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
       - sh
       - -c
       - |
-        cat > /tmp/sentinel.conf <<'EOF'
+        if [ ! -f /data/sentinel.conf ]; then
+          cat > /data/sentinel.conf <<'EOF'
         port 26379
         sentinel resolve-hostnames yes
         sentinel announce-hostnames yes
@@ -92,10 +97,11 @@ services:
         sentinel announce-port 26379
         sentinel monitor mymaster host.docker.internal 6379 2
         sentinel down-after-milliseconds mymaster 5000
-        sentinel failover-timeout mymaster 10000
+        sentinel failover-timeout mymaster 60000
         sentinel parallel-syncs mymaster 1
         EOF
-        exec redis-sentinel /tmp/sentinel.conf
+        fi
+        exec redis-sentinel /data/sentinel.conf
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26379", "ping"]
       interval: 5s
@@ -109,13 +115,16 @@ services:
         condition: service_healthy
     ports:
       - "26380:26380"
+    volumes:
+      - redis-sentinel-2-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
       - sh
       - -c
       - |
-        cat > /tmp/sentinel.conf <<'EOF'
+        if [ ! -f /data/sentinel.conf ]; then
+          cat > /data/sentinel.conf <<'EOF'
         port 26380
         sentinel resolve-hostnames yes
         sentinel announce-hostnames yes
@@ -123,10 +132,11 @@ services:
         sentinel announce-port 26380
         sentinel monitor mymaster host.docker.internal 6379 2
         sentinel down-after-milliseconds mymaster 5000
-        sentinel failover-timeout mymaster 10000
+        sentinel failover-timeout mymaster 60000
         sentinel parallel-syncs mymaster 1
         EOF
-        exec redis-sentinel /tmp/sentinel.conf
+        fi
+        exec redis-sentinel /data/sentinel.conf
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26380", "ping"]
       interval: 5s
@@ -140,13 +150,16 @@ services:
         condition: service_healthy
     ports:
       - "26381:26381"
+    volumes:
+      - redis-sentinel-3-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
       - sh
       - -c
       - |
-        cat > /tmp/sentinel.conf <<'EOF'
+        if [ ! -f /data/sentinel.conf ]; then
+          cat > /data/sentinel.conf <<'EOF'
         port 26381
         sentinel resolve-hostnames yes
         sentinel announce-hostnames yes
@@ -154,10 +167,11 @@ services:
         sentinel announce-port 26381
         sentinel monitor mymaster host.docker.internal 6379 2
         sentinel down-after-milliseconds mymaster 5000
-        sentinel failover-timeout mymaster 10000
+        sentinel failover-timeout mymaster 60000
         sentinel parallel-syncs mymaster 1
         EOF
-        exec redis-sentinel /tmp/sentinel.conf
+        fi
+        exec redis-sentinel /data/sentinel.conf
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26381", "ping"]
       interval: 5s
@@ -248,6 +262,9 @@ volumes:
   redis-master-data:
   redis-replica-1-data:
   redis-replica-2-data:
+  redis-sentinel-1-data:
+  redis-sentinel-2-data:
+  redis-sentinel-3-data:
   rabbitmq-data:
   influxdb-data:
   prometheus-data:
