@@ -55,10 +55,10 @@ symbol: "BTCUSDT"
 REST 응답의 `lastPrice`와 `priceChangePercent`를 즉시 Redis에 저장하여, WebSocket 연결 전에도 시세를 제공한다.
 
 ```
-ExchangeInitializer.loadBinance():
-  1. REST 호출 → USDT 필터 → MarketInfoCache 적재
-  2. 각 항목을 NormalizedTicker로 변환 → TickerRedisRepository.save()
-  3. RealtimePriceCollector.connectBinance()
+ExchangeInitializer.loadAndConnectBinance():
+  1. REST 호출 → USDT 필터 → MarketInfoCache 적재 + TickerRedisRepository.save()
+  2. MarketMetadataRedisRepository.save()
+  3. binanceWebSocketHandler.connect()
 ```
 
 순서가 중요하다: 캐시 적재 + Redis 초기 스냅샷 저장이 완료된 후 WebSocket을 연결한다.

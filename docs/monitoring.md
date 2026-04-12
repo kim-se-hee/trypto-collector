@@ -14,23 +14,22 @@ Micrometer + Spring Boot Actuator로 측정한다.
 
 # 메트릭 목록
 
-## AOP 계측 (어노테이션 기반, 3개)
+## AOP 계측 (어노테이션 기반, 1개)
 
 | 메트릭 | 타입 | 태그 | 어노테이션 | 대상 메서드 | 역할 |
 |--------|------|------|-----------|------------|------|
 | `redis.write.time` | Timer | — | `@Timed` | `TickerRedisRepository.save()` | Redis SET 소요 시간 |
-| `candle.flush.duration` | Timer | — | `@Timed` | `CandleFlushScheduler.flush()` | InfluxDB 배치 write 소요 시간 |
-| `candle.flush.failure` | Counter | — | `Counter.builder` | `CandleFlushScheduler.flush()` | InfluxDB write 실패 횟수 |
 
-## 직접 계측 (5개)
+## 직접 계측 (6개)
 
 | 메트릭 | 타입 | 태그 | 컴포넌트 | 역할 |
 |--------|------|------|----------|------|
-| `ticker.latency` | Timer | `exchange` | `TickerSinkProcessor` | 파이프라인 처리 시간 (메서드 진입 → Redis/RabbitMQ 완료) |
+| `ticker.latency` | Timer | `exchange` | `TickerSinkProcessor` | 파이프라인 처리 시간 (메서드 진입 → Redis/RabbitMQ/매칭 완료) |
 | `rabbitmq.publish` | Counter | `exchange` | `TickerEventPublisher` | RabbitMQ 발행 성공 횟수 (거래소별 처리량 측정) |
 | `ticker.parse.failure` | Counter | `exchange` | `{거래소}WebSocketHandler` | WebSocket 메시지 파싱 실패 횟수 |
 | `websocket.reconnect` | Counter | `exchange` | `{거래소}WebSocketHandler` | WebSocket 재연결 횟수 (while 루프 내부 분기) |
 | `rabbitmq.nack.count` | Counter | — | `RabbitMQConfig` | 브로커 메시지 수신 거부 횟수 (confirm 콜백) |
+| `matching.matched.count` | Counter | `exchange` | `PendingOrderMatcher` | 주문 매칭 건수 (거래소별) |
 
 ## 자동 수집
 
