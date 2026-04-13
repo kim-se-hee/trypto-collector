@@ -18,7 +18,11 @@ public class LeaderLifecycleListener {
     @EventListener
     public void onAcquired(LeadershipAcquiredEvent event) {
         log.info("리더 활성화 시퀀스 시작");
-        warmupService.warmup();
+        try {
+            warmupService.warmup();
+        } catch (Exception e) {
+            log.warn("웜업 실패, 시세 수집은 계속 진행: {}", e.getMessage());
+        }
         exchangeInitializer.start();
         log.info("리더 활성화 시퀀스 완료");
     }
