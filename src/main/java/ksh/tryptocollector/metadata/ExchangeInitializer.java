@@ -84,7 +84,7 @@ public class ExchangeInitializer {
                 return;
             } catch (Exception e) {
                 retryCount++;
-                log.warn("{} 초기화 실패, 재시도 #{}: {}", exchangeName, retryCount, e.getMessage());
+                log.warn("{} 초기화 실패, 재시도 {}: {}", exchangeName, retryCount, e.getMessage(), e);
                 backoff(retryCount);
             }
         }

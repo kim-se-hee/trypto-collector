@@ -70,7 +70,7 @@ public class RestPollingFallback {
                 tickerSinkProcessor.process(ticker, receivedAtNanos);
             }
         } catch (Exception e) {
-            log.warn("{} REST 폴링 실패: {}", exchange, e.getMessage());
+            log.warn("{} REST 폴링 실패: {}", exchange, e.getMessage(), e);
         }
     }
 
