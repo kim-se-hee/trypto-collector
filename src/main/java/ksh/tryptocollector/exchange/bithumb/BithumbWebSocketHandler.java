@@ -3,6 +3,7 @@ package ksh.tryptocollector.exchange.bithumb;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
+import ksh.tryptocollector.exchange.RestPollingFallback;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
@@ -28,14 +29,17 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerSinkProcessor tickerSinkProcessor;
+    private final RestPollingFallback restPollingFallback;
     private final Counter reconnectCounter;
     private final Counter parseFailureCounter;
 
     public BithumbWebSocketHandler(ObjectMapper objectMapper, MarketInfoCache marketInfoCache,
-                                   TickerSinkProcessor tickerSinkProcessor, MeterRegistry registry) {
+                                   TickerSinkProcessor tickerSinkProcessor, RestPollingFallback restPollingFallback,
+                                   MeterRegistry registry) {
         this.objectMapper = objectMapper;
         this.marketInfoCache = marketInfoCache;
         this.tickerSinkProcessor = tickerSinkProcessor;
+        this.restPollingFallback = restPollingFallback;
         this.reconnectCounter = Counter.builder("websocket.reconnect")
                 .tag("exchange", Exchange.BITHUMB.name())
                 .register(registry);
@@ -59,11 +63,17 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
                 String subscribeMessage = buildSubscribeMessage();
                 ws.sendText(subscribeMessage, true);
                 log.info("빗썸 WebSocket 연결 시작");
+                restPollingFallback.stop(Exchange.BITHUMB);
                 retryCount = 0;
                 closeLatch.await();
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted() || e instanceof InterruptedException) {
+                    log.info("빗썸 WebSocket 스레드 종료");
+                    return;
+                }
                 reconnectCounter.increment();
                 log.warn("빗썸 WebSocket 연결 끊김, 재연결 시도 #{}", retryCount + 1, e);
+                restPollingFallback.start(Exchange.BITHUMB);
                 backoff(retryCount++);
             }
         }

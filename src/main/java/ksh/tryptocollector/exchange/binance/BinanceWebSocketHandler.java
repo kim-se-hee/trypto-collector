@@ -3,6 +3,7 @@ package ksh.tryptocollector.exchange.binance;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.exchange.ExchangeTickerStream;
+import ksh.tryptocollector.exchange.RestPollingFallback;
 import ksh.tryptocollector.exchange.TickerSinkProcessor;
 import ksh.tryptocollector.metadata.MarketInfoCache;
 import ksh.tryptocollector.model.Exchange;
@@ -26,14 +27,17 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
     private final ObjectMapper objectMapper;
     private final MarketInfoCache marketInfoCache;
     private final TickerSinkProcessor tickerSinkProcessor;
+    private final RestPollingFallback restPollingFallback;
     private final Counter reconnectCounter;
     private final Counter parseFailureCounter;
 
     public BinanceWebSocketHandler(ObjectMapper objectMapper, MarketInfoCache marketInfoCache,
-                                   TickerSinkProcessor tickerSinkProcessor, MeterRegistry registry) {
+                                   TickerSinkProcessor tickerSinkProcessor, RestPollingFallback restPollingFallback,
+                                   MeterRegistry registry) {
         this.objectMapper = objectMapper;
         this.marketInfoCache = marketInfoCache;
         this.tickerSinkProcessor = tickerSinkProcessor;
+        this.restPollingFallback = restPollingFallback;
         this.reconnectCounter = Counter.builder("websocket.reconnect")
                 .tag("exchange", Exchange.BINANCE.name())
                 .register(registry);
@@ -55,11 +59,17 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
                         .buildAsync(URI.create(wsUrl), new BinanceListener(closeLatch))
                         .join();
                 log.info("바이낸스 WebSocket 연결 시작");
+                restPollingFallback.stop(Exchange.BINANCE);
                 retryCount = 0;
                 closeLatch.await();
             } catch (Exception e) {
+                if (Thread.currentThread().isInterrupted() || e instanceof InterruptedException) {
+                    log.info("바이낸스 WebSocket 스레드 종료");
+                    return;
+                }
                 reconnectCounter.increment();
                 log.warn("바이낸스 WebSocket 연결 끊김, 재연결 시도 #{}", retryCount + 1, e);
+                restPollingFallback.start(Exchange.BINANCE);
                 backoff(retryCount++);
             }
         }

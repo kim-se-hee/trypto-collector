@@ -1,80 +1,57 @@
 services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  rabbitmq:
-    image: rabbitmq:4-management-alpine
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  influxdb:
-    image: influxdb:2-alpine
-    ports:
-      - "8086:8086"
-    volumes:
-      - influxdb-data:/var/lib/influxdb2
-      - ./influxdb/init-tasks.sh:/docker-entrypoint-initdb.d/init-tasks.sh
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
-      DOCKER_INFLUXDB_INIT_ORG: trypto
-      DOCKER_INFLUXDB_INIT_BUCKET: candle
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: trypto-collector-token
-    healthcheck:
-      test: ["CMD", "influx", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  app:
+  collector:
     build: .
+    image: kimsehee98/trypto-collector:v1
+    networks:
+      - trypto-net
     ports:
-      - "8081:8080"
+      - "8081:8081"
       - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      COLLECTOR_EXCHANGE_STREAMS_ENABLED: "false"
+      SPRING_DATA_REDIS_SENTINEL_MASTER: mymaster
+      SPRING_DATA_REDIS_SENTINEL_NODES: redis-sentinel-1:26379,redis-sentinel-2:26380,redis-sentinel-3:26381
+      SPRING_RABBITMQ_HOST: rabbitmq
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: trypto-collector-token
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: 1234
+      MANAGEMENT_PORT: 9090
     depends_on:
-      redis:
+      mysql:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
       influxdb:
         condition: service_healthy
-    environment:
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_RABBITMQ_HOST: rabbitmq
-      INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: trypto-collector-token
-      MANAGEMENT_PORT: 9090
+      redis-sentinel-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
 
   prometheus:
     image: prom/prometheus:latest
+    networks:
+      - trypto-net
     ports:
       - "9091:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     depends_on:
-      - app
+      - collector
 
   grafana:
     image: grafana/grafana:latest
+    networks:
+      - trypto-net
     ports:
       - "3000:3000"
     volumes:
@@ -85,8 +62,5 @@ services:
       - prometheus
 
 volumes:
-  redis-data:
-  rabbitmq-data:
-  influxdb-data:
   prometheus-data:
   grafana-data:

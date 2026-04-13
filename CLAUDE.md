@@ -6,9 +6,9 @@
 
 # 프로젝트 개요
 
-코인 모의투자 플랫폼(trypto-backend)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행한다. 백엔드는 Redis에서 시세를 조회하고, RabbitMQ 이벤트를 수신하여 미체결 주문 매칭에 활용한다.
+코인 모의투자 플랫폼(trypto-api)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, InfluxDB에 raw tick을 저장한다. 시세 수신 시 Redis ZSet 기반으로 미체결 주문을 매칭하여 체결 메시지를 RabbitMQ로 발행한다. 백엔드는 Redis에서 시세를 조회하고, 시세 이벤트를 수신하여 WebSocket 브로드캐스트에, 체결 메시지(`matched.orders`)를 수신하여 주문 상태 갱신에 활용한다.
 
-**데이터 흐름:** 거래소 REST API(마켓 목록 조회) → 메타데이터 캐시 적재 → WebSocket 연결 → 실시간 시세 수신 → NormalizedTicker로 정규화 → Redis 저장(TTL 30초) + RabbitMQ 이벤트 발행
+**데이터 흐름:** 거래소 REST API(마켓 목록 조회) → 메타데이터 캐시 적재 → WebSocket 연결 → 실시간 시세 수신 → NormalizedTicker로 정규화 → InfluxDB raw tick 저장 + Redis 저장(TTL 30초) + RabbitMQ 이벤트 발행 + 미체결 주문 매칭
 
 **기술 스택**
 
@@ -18,10 +18,13 @@
 | 프레임워크 | Spring Boot (Web) | 4.0.3 |
 | 빌드 | Gradle | |
 | Redis 클라이언트 | Spring Data Redis (`StringRedisTemplate`) | |
+| 분산 락 | Redisson (코어) | |
 | 메시지 브로커 | RabbitMQ (Spring AMQP) | |
+| DB | Spring JDBC + MySQL | |
 | HTTP 클라이언트 | RestClient | |
 | WebSocket 클라이언트 | `java.net.http.HttpClient` + `WebSocket` | |
 | 시계열 DB | InfluxDB (`influxdb-client-java`) | |
+| 서킷 브레이커 | Resilience4j | |
 | 유틸리티 | Lombok | |
 | 컨테이너 | Docker Compose | |
 
@@ -35,14 +38,15 @@
 
 ```
 ksh.tryptocollector/
-├── config/        # 공유 인프라 설정
+├── config/        # 공유 인프라 설정 (리더 선출, 서킷 브레이커, Redisson, InfluxDB)
 ├── model/         # 정규화된 도메인 모델 (enum, record)
-├── exchange/      # 거래소 공통 인터페이스, WebSocket 오케스트레이터
+├── exchange/      # 거래소 공통 인터페이스, WebSocket 오케스트레이터, REST 폴링 폴백
 │   ├── upbit/     # 업비트 REST + WebSocket + DTO
 │   ├── bithumb/   # 빗썸 REST + WebSocket + DTO
 │   └── binance/   # 바이낸스 REST + WebSocket + DTO
 ├── metadata/      # 마켓 메타데이터 캐시, 초기화
-├── candle/        # 인메모리 분봉 생성, InfluxDB 저장
+├── matching/      # Redis ZSet 기반 미체결 주문 매칭, 보상 스케줄러, 워밍업
+├── tick/          # InfluxDB raw tick 저장
 ├── redis/         # 시세 Redis 저장
 └── rabbitmq/      # 시세 이벤트 RabbitMQ 발행
 ```
@@ -167,5 +171,5 @@ GitHub Flow를 따른다. `main` 브랜치와 `feature/*` 브랜치만 사용한
 - 전체 아키텍처: `docs/architecture.md`
 - 공통 인프라: `docs/common-infrastructure.md`
 - 거래소별: `docs/upbit.md`, `docs/bithumb.md`, `docs/binance.md`
-- 캔들 데이터 수집: `docs/candle.md`
+- 캔들 데이터: `docs/candle.md`
 - 모니터링: `docs/monitoring.md`

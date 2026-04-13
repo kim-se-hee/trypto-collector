@@ -1,10 +1,13 @@
 package ksh.tryptocollector.exchange;
 
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import ksh.tryptocollector.candle.CandleBuffer;
+import ksh.tryptocollector.matching.PendingOrderMatcher;
 import ksh.tryptocollector.model.NormalizedTicker;
 import ksh.tryptocollector.rabbitmq.TickerEventPublisher;
 import ksh.tryptocollector.redis.TickerRedisRepository;
+import ksh.tryptocollector.tick.TickRawWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,28 +31,33 @@ class TickerSinkProcessorTest {
     private TickerEventPublisher tickerEventPublisher;
 
     @Mock
-    private CandleBuffer candleBuffer;
+    private TickRawWriter tickRawWriter;
+
+    @Mock
+    private PendingOrderMatcher pendingOrderMatcher;
 
     private TickerSinkProcessor tickerSinkProcessor;
 
     @BeforeEach
     void setUp() {
+        CircuitBreaker circuitBreaker = CircuitBreakerRegistry.ofDefaults().circuitBreaker("redis");
         tickerSinkProcessor = new TickerSinkProcessor(
-                tickerRedisRepository, tickerEventPublisher, candleBuffer, new SimpleMeterRegistry());
+                tickerRedisRepository, tickerEventPublisher, tickRawWriter,
+                pendingOrderMatcher, circuitBreaker, new SimpleMeterRegistry());
     }
 
     @Test
-    @DisplayName("CandleBuffer가 예외를 던져도 Redis 저장과 RabbitMQ 발행은 정상 수행된다")
-    void givenCandleBufferThrows_whenProcess_thenRedisAndRabbitMqStillProceed() {
+    @DisplayName("TickRawWriter가 예외를 던져도 Redis 저장과 RabbitMQ 발행은 정상 수행된다")
+    void givenTickRawWriterThrows_whenProcess_thenRedisAndRabbitMqStillProceed() {
         // given
         NormalizedTicker ticker = new NormalizedTicker(
                 "upbit", "BTC", "KRW", "BTC/KRW",
                 new BigDecimal("50000000"), BigDecimal.ZERO, BigDecimal.ZERO, System.currentTimeMillis()
         );
-        willThrow(new RuntimeException("buffer error")).given(candleBuffer).update(any());
+        willThrow(new RuntimeException("write error")).given(tickRawWriter).write(any());
 
         // when
-        tickerSinkProcessor.process(ticker);
+        tickerSinkProcessor.process(ticker, System.nanoTime());
 
         // then
         verify(tickerRedisRepository).save(ticker);

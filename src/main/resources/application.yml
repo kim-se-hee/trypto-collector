@@ -4,10 +4,17 @@ server:
 spring:
   application:
     name: trypto-collector
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:3306/trypto
+    username: ${DB_USERNAME:readonly}
+    password: ${DB_PASSWORD:readonly}
   data:
     redis:
-      host: localhost
-      port: 6379
+      sentinel:
+        master: ${REDIS_SENTINEL_MASTER:mymaster}
+        nodes: ${REDIS_SENTINEL_NODES:localhost:26379,localhost:26380,localhost:26381}
+      timeout: 200ms
+      connect-timeout: 500ms
   rabbitmq:
     host: localhost
     port: 5672
@@ -18,16 +25,13 @@ exchange:
   upbit:
     rest-url: https://api.upbit.com/v1/market/all
     ticker-url: https://api.upbit.com/v1/ticker
-    candle-url: https://api.upbit.com/v1/candles/minutes/1
     ws-url: wss://api.upbit.com/websocket/v1
   bithumb:
     rest-url: https://api.bithumb.com/v1/market/all?isDetails=false
     ticker-url: https://api.bithumb.com/v1/ticker
-    candle-url: https://api.bithumb.com/public/candlestick
     ws-url: wss://ws-api.bithumb.com/websocket/v1
   binance:
     rest-url: https://api.binance.com/api/v3/ticker/24hr
-    candle-url: https://api.binance.com/api/v3/klines
     ws-url: wss://stream.binance.com:9443/ws/!miniTicker@arr
 
 ticker:
@@ -40,7 +44,7 @@ influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
   token: ${INFLUXDB_TOKEN:trypto-collector-token}
   org: ${INFLUXDB_ORG:trypto}
-  bucket: ${INFLUXDB_BUCKET:candle}
+  bucket: ${INFLUXDB_BUCKET:ticker}
 
 management:
   server:
@@ -54,7 +58,6 @@ management:
       percentiles-histogram:
         ticker.latency: true
         redis.write.time: true
-        candle.flush.duration: true
 
 logging:
   level:

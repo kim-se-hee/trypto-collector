@@ -2,9 +2,7 @@ package ksh.tryptocollector.metadata;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import ksh.tryptocollector.candle.CandleBackfillService;
 import ksh.tryptocollector.exchange.binance.BinanceRestClient;
 import ksh.tryptocollector.exchange.binance.BinanceWebSocketHandler;
 import ksh.tryptocollector.exchange.bithumb.BithumbRestClient;
@@ -20,6 +18,7 @@ import ksh.tryptocollector.redis.MarketMetadataRedisRepository;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -45,8 +44,10 @@ public class ExchangeInitializer {
     private final UpbitWebSocketHandler upbitWebSocketHandler;
     private final BithumbWebSocketHandler bithumbWebSocketHandler;
     private final BinanceWebSocketHandler binanceWebSocketHandler;
-    private final CandleBackfillService candleBackfillService;
     private final MeterRegistry meterRegistry;
+
+    @Value("${collector.exchange-streams.enabled:true}")
+    private boolean exchangeStreamsEnabled;
 
     private static final long MAX_BACKOFF_SECONDS = 60;
     private static final int CHANGE_RATE_SCALE = 8;
@@ -55,18 +56,55 @@ public class ExchangeInitializer {
 
     private ExecutorService exchangeThreadPool;
 
-    @PostConstruct
-    void init() {
+    public void start() {
+        if (exchangeThreadPool != null) {
+            return;
+        }
         exchangeThreadPool = ExecutorServiceMetrics.monitor(
                 meterRegistry, Executors.newFixedThreadPool(THREAD_POOL_SIZE), EXECUTOR_METRIC_NAME);
-        exchangeThreadPool.submit(() -> initWithRetry("업비트", this::loadAndConnectUpbit));
-        exchangeThreadPool.submit(() -> initWithRetry("빗썸", this::loadAndConnectBithumb));
-        exchangeThreadPool.submit(() -> initWithRetry("바이낸스", this::loadAndConnectBinance));
+        exchangeThreadPool.submit(() -> initWithRetry("업비트", this::initUpbit));
+        exchangeThreadPool.submit(() -> initWithRetry("빗썸", this::initBithumb));
+        exchangeThreadPool.submit(() -> initWithRetry("바이낸스", this::initBinance));
+    }
+
+    private void initUpbit() {
+        loadUpbitMetadata();
+        if (exchangeStreamsEnabled) {
+            upbitWebSocketHandler.connect();
+        } else {
+            log.info("업비트 WebSocket 연결을 건너뜁니다 (streams disabled).");
+        }
+    }
+
+    private void initBithumb() {
+        loadBithumbMetadata();
+        if (exchangeStreamsEnabled) {
+            bithumbWebSocketHandler.connect();
+        } else {
+            log.info("빗썸 WebSocket 연결을 건너뜁니다 (streams disabled).");
+        }
+    }
+
+    private void initBinance() {
+        loadBinanceMetadata();
+        if (exchangeStreamsEnabled) {
+            binanceWebSocketHandler.connect();
+        } else {
+            log.info("바이낸스 WebSocket 연결을 건너뜁니다 (streams disabled).");
+        }
+    }
+
+    public void stop() {
+        if (exchangeThreadPool == null) {
+            return;
+        }
+        exchangeThreadPool.shutdownNow();
+        exchangeThreadPool = null;
     }
 
     @PreDestroy
     void shutdown() {
-        exchangeThreadPool.shutdownNow();
+        stop();
     }
 
     private void initWithRetry(String exchangeName, Runnable task) {
@@ -77,13 +115,13 @@ public class ExchangeInitializer {
                 return;
             } catch (Exception e) {
                 retryCount++;
-                log.warn("{} 초기화 실패, 재시도 #{}: {}", exchangeName, retryCount, e.getMessage());
+                log.warn("{} 초기화 실패, 재시도 {}: {}", exchangeName, retryCount, e.getMessage(), e);
                 backoff(retryCount);
             }
         }
     }
 
-    private void loadAndConnectUpbit() {
+    private void loadUpbitMetadata() {
         List<MarketInfo> infos = upbitRestClient.fetchKrwMarkets();
         List<String> marketCodes = new ArrayList<>();
         Map<String, MarketInfo> infoByMarket = new HashMap<>();
@@ -102,12 +140,9 @@ public class ExchangeInitializer {
             tickerRedisRepository.save(ticker.toNormalized(info.displayName()));
         }
         log.info("업비트 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
-
-        startBackfillThread(Exchange.UPBIT);
-        upbitWebSocketHandler.connect();
     }
 
-    private void loadAndConnectBithumb() {
+    private void loadBithumbMetadata() {
         List<MarketInfo> infos = bithumbRestClient.fetchKrwMarkets();
         List<String> marketCodes = new ArrayList<>();
         Map<String, MarketInfo> infoByMarket = new HashMap<>();
@@ -126,12 +161,9 @@ public class ExchangeInitializer {
             tickerRedisRepository.save(ticker.toNormalized(info.displayName()));
         }
         log.info("빗썸 초기 시세 스냅샷 저장 완료: {}개", tickers.size());
-
-        startBackfillThread(Exchange.BITHUMB);
-        bithumbWebSocketHandler.connect();
     }
 
-    private void loadAndConnectBinance() {
+    private void loadBinanceMetadata() {
         var tickers = binanceRestClient.fetchUsdtTickers();
         for (var ticker : tickers) {
             String base = ticker.symbol().replace("USDT", "");
@@ -152,19 +184,6 @@ public class ExchangeInitializer {
         }
         log.info("바이낸스 마켓 메타데이터 로드 및 초기 스냅샷 저장 완료");
         marketMetadataRedisRepository.save(Exchange.BINANCE, marketInfoCache.getMarketInfos(Exchange.BINANCE));
-
-        startBackfillThread(Exchange.BINANCE);
-        binanceWebSocketHandler.connect();
-    }
-
-    private void startBackfillThread(Exchange exchange) {
-        new Thread(() -> {
-            try {
-                candleBackfillService.backfill(exchange);
-            } catch (Exception e) {
-                log.warn("{} 캔들 갭 복구 실패: {}", exchange, e.getMessage());
-            }
-        }, "backfill-" + exchange.name().toLowerCase()).start();
     }
 
     private void backoff(int retryCount) {

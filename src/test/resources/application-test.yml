@@ -1,0 +1,25 @@
+spring:
+  data:
+    redis:
+      sentinel:
+        master:
+        nodes:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+ticker:
+  redis-key-prefix: ticker
+
+market-meta:
+  redis-key-prefix: market-meta
+
+logging:
+  level:
+    ksh.tryptocollector: INFO
+    org.redisson: WARN
+    io.lettuce: WARN
