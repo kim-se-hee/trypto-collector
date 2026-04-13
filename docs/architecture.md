@@ -2,7 +2,7 @@
 
 ## 개요
 
-trypto-collector는 업비트, 빗썸, 바이낸스 세 거래소의 실시간 시세를 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, InfluxDB에 raw tick을 저장하는 수집기다. 시세 수신 시 Redis ZSet 기반으로 미체결 주문을 매칭하여 체결 메시지를 RabbitMQ로 발행한다. 백엔드(trypto-backend)는 Redis에서 시세를 조회하여 수익률 계산 등에 활용하고, 시세 이벤트를 수신하여 WebSocket 브로드캐스트에, 체결 메시지(`matched.orders`)를 수신하여 주문 상태 갱신에, InfluxDB에서 캔들 데이터를 조회하여 차트 표시에 활용한다.
+trypto-collector는 업비트, 빗썸, 바이낸스 세 거래소의 실시간 시세를 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, InfluxDB에 raw tick을 저장하는 수집기다. 시세 수신 시 Redis ZSet 기반으로 미체결 주문을 매칭하여 체결 메시지를 RabbitMQ로 발행한다. 백엔드(trypto-api)는 Redis에서 시세를 조회하여 수익률 계산 등에 활용하고, 시세 이벤트를 수신하여 WebSocket 브로드캐스트에, 체결 메시지(`matched.orders`)를 수신하여 주문 상태 갱신에, InfluxDB에서 캔들 데이터를 조회하여 차트 표시에 활용한다.
 
 외부 API → 정규화 → Redis, InfluxDB 저장의 단방향 파이프라인이다. 캔들 집계(1분봉, 5분봉)는 InfluxDB Task가 서버 사이드에서 수행한다.
 
@@ -47,9 +47,9 @@ PendingOrderMatcher                          │
     │   (서킷 브레이커 → DB 폴백)   [Quorum Queue:
     │                               matched.orders]
     └── MatchedOrderPublisher               │
-        Publisher Confirms → ZREM     trypto-backend
+        Publisher Confirms → ZREM     trypto-api
                                      (FillPendingOrderService)
-trypto-backend
+trypto-api
     ├── Redis에서 시세 조회
     └── Redis에서 마켓 메타데이터 조회 → DB 저장
 ```
@@ -87,7 +87,7 @@ trypto-backend
 
 ### RabbitMQ 시세 이벤트 발행
 
-시세가 갱신될 때마다 RabbitMQ Fanout Exchange(`ticker.exchange`)로 시세 변경 이벤트를 발행한다. 트레이딩 서버(trypto-backend)는 이 이벤트를 수신하여 WebSocket 브로드캐스트에 활용한다.
+시세가 갱신될 때마다 RabbitMQ Fanout Exchange(`ticker.exchange`)로 시세 변경 이벤트를 발행한다. 트레이딩 서버(trypto-api)는 이 이벤트를 수신하여 WebSocket 브로드캐스트에 활용한다.
 
 - **Publisher Confirms**: 브로커가 메시지를 수신했는지 확인한다
 - **Fanout Exchange**: 모든 트레이딩 서버가 동일한 이벤트를 수신해야 하므로 Fanout을 사용한다. 큐 바인딩은 소비자(트레이딩 서버)가 담당한다
@@ -182,7 +182,7 @@ WebSocket 재연결이 지속적으로 실패하면 `RestPollingFallback`이 200
 
 ### 마켓 메타데이터 Redis 저장
 
-거래소별 상장 코인 목록(`MarketInfo`)을 Redis에 저장하여 백엔드(trypto-backend)가 기동 시 조회하여 DB에 저장할 수 있도록 한다.
+거래소별 상장 코인 목록(`MarketInfo`)을 Redis에 저장하여 백엔드(trypto-api)가 기동 시 조회하여 DB에 저장할 수 있도록 한다.
 
 - **키 포맷:** `market-meta:{EXCHANGE}` (예: `market-meta:UPBIT`)
 - **값:** `MarketInfo` 배열의 JSON (예: `[{"base":"BTC","quote":"KRW","pair":"BTC/KRW","displayName":"비트코인"}, ...]`)

@@ -6,7 +6,7 @@
 
 # 프로젝트 개요
 
-코인 모의투자 플랫폼(trypto-backend)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, InfluxDB에 raw tick을 저장한다. 시세 수신 시 Redis ZSet 기반으로 미체결 주문을 매칭하여 체결 메시지를 RabbitMQ로 발행한다. 백엔드는 Redis에서 시세를 조회하고, 시세 이벤트를 수신하여 WebSocket 브로드캐스트에, 체결 메시지(`matched.orders`)를 수신하여 주문 상태 갱신에 활용한다.
+코인 모의투자 플랫폼(trypto-api)의 실시간 시세 수집기다. 업비트, 빗썸, 바이낸스 세 거래소의 시세를 WebSocket으로 수집하여 Redis에 저장하고, RabbitMQ로 시세 변경 이벤트를 발행하며, InfluxDB에 raw tick을 저장한다. 시세 수신 시 Redis ZSet 기반으로 미체결 주문을 매칭하여 체결 메시지를 RabbitMQ로 발행한다. 백엔드는 Redis에서 시세를 조회하고, 시세 이벤트를 수신하여 WebSocket 브로드캐스트에, 체결 메시지(`matched.orders`)를 수신하여 주문 상태 갱신에 활용한다.
 
 **데이터 흐름:** 거래소 REST API(마켓 목록 조회) → 메타데이터 캐시 적재 → WebSocket 연결 → 실시간 시세 수신 → NormalizedTicker로 정규화 → InfluxDB raw tick 저장 + Redis 저장(TTL 30초) + RabbitMQ 이벤트 발행 + 미체결 주문 매칭
 
