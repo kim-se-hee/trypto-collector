@@ -58,6 +58,8 @@ management:
       percentiles-histogram:
         ticker.latency: true
         redis.write.time: true
+        match.decision.latency: true
+        match.publish.latency: true
 
 logging:
   level:
