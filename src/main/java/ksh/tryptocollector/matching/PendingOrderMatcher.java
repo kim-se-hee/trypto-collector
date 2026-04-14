@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -31,7 +32,15 @@ public class PendingOrderMatcher {
         MatchResult result = findMatchedOrders(exchange, symbol, ticker.base(), ticker.lastPrice());
         if (result.isEmpty()) return;
 
-        boolean acked = matchedOrderPublisher.publish(new MatchedOrderMessage(result.items()));
+        long decisionMs = System.currentTimeMillis();
+        meterRegistry.timer("match.decision.latency", "exchange", exchange)
+                .record(decisionMs - ticker.tsMs(), TimeUnit.MILLISECONDS);
+
+        long publishedAtMs = System.currentTimeMillis();
+        boolean acked = matchedOrderPublisher.publish(
+                new MatchedOrderMessage(ticker.tsMs(), publishedAtMs, result.items()));
+        meterRegistry.timer("match.publish.latency", "exchange", exchange, "acked", String.valueOf(acked))
+                .record(System.currentTimeMillis() - ticker.tsMs(), TimeUnit.MILLISECONDS);
 
         if (acked) {
             removeMatchedFromRedis(result, exchange, symbol);
