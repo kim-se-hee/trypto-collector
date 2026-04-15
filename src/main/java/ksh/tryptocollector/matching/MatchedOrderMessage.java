@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record MatchedOrderMessage(
+        long matchStartedAtMs,
         long tickerTsMs,
         long publishedAtMs,
         List<Item> matched

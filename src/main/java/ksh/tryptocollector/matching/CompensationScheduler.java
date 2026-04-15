@@ -55,7 +55,7 @@ public class CompensationScheduler {
     private void publishMatch(PendingOrder order, BigDecimal filledPrice) {
         var item = new MatchedOrderMessage.Item(order.orderId(), filledPrice);
         long now = System.currentTimeMillis();
-        matchedOrderPublisher.publish(new MatchedOrderMessage(now, now, List.of(item)));
+        matchedOrderPublisher.publish(new MatchedOrderMessage(now, now, now, List.of(item)));
     }
 
     private void addToRedisZSet(PendingOrder order, String symbol) {

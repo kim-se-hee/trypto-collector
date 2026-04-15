@@ -2,7 +2,6 @@ package ksh.tryptocollector.matching;
 
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import ksh.tryptocollector.model.NormalizedTicker;
 import lombok.RequiredArgsConstructor;
@@ -26,21 +25,18 @@ public class PendingOrderMatcher {
     private final MeterRegistry meterRegistry;
 
     public void match(NormalizedTicker ticker) {
+        long matchStartedAtMs = System.currentTimeMillis();
         String exchange = ticker.exchange();
         String symbol = ticker.base() + "/" + ticker.quote();
 
         MatchResult result = findMatchedOrders(exchange, symbol, ticker.base(), ticker.lastPrice());
         if (result.isEmpty()) return;
 
-        long decisionMs = System.currentTimeMillis();
-        meterRegistry.timer("match.decision.latency", "exchange", exchange)
-                .record(decisionMs - ticker.tsMs(), TimeUnit.MILLISECONDS);
-
         long publishedAtMs = System.currentTimeMillis();
         boolean acked = matchedOrderPublisher.publish(
-                new MatchedOrderMessage(ticker.tsMs(), publishedAtMs, result.items()));
+                new MatchedOrderMessage(matchStartedAtMs, ticker.tsMs(), publishedAtMs, result.items()));
         meterRegistry.timer("match.publish.latency", "exchange", exchange, "acked", String.valueOf(acked))
-                .record(System.currentTimeMillis() - ticker.tsMs(), TimeUnit.MILLISECONDS);
+                .record(System.currentTimeMillis() - matchStartedAtMs, TimeUnit.MILLISECONDS);
 
         if (acked) {
             removeMatchedFromRedis(result, exchange, symbol);
@@ -48,8 +44,6 @@ public class PendingOrderMatcher {
         } else {
             log.warn("주문 매칭 발행 실패: {}/{} {}건", exchange, symbol, result.items().size());
         }
-
-        recordMetrics(exchange, acked, result.items().size());
     }
 
     private MatchResult findMatchedOrders(String exchange, String symbol, String base, BigDecimal price) {
@@ -81,13 +75,5 @@ public class PendingOrderMatcher {
         if (!result.sellOrderIds().isEmpty()) {
             pendingOrderRedisRepository.removeAll(exchange, symbol, "SELL", result.sellOrderIds());
         }
-    }
-
-    private void recordMetrics(String exchange, boolean acked, int count) {
-        Counter.builder("matching.matched.count")
-                .tag("exchange", exchange)
-                .tag("acked", String.valueOf(acked))
-                .register(meterRegistry)
-                .increment(count);
     }
 }
