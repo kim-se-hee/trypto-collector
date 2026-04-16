@@ -11,3 +11,15 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ['backend:8080']
+
+  - job_name: 'mysqld'
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
