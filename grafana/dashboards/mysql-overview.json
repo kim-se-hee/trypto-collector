@@ -7,13 +7,13 @@
   "panels": [
     {
       "id": 1,
-      "title": "MySQL 컨테이너 CPU (%)",
+      "title": "MySQL CPU (호스트 전체 대비 %)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=\"mysql\"}[1m])) * 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=\"mysql\"}[1m])) / count(node_cpu_seconds_total{mode=\"idle\"}) * 100",
           "legendFormat": "mysql"
         }
       ],
