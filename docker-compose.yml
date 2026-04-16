@@ -1,7 +1,7 @@
 services:
   collector:
-    build: .
-    image: kimsehee98/trypto-collector:v1
+    image: ${COLLECTOR_IMAGE:-kimsehee98/trypto-collector:v1}
+    pull_policy: always
     networks:
       - trypto-net
     ports:
