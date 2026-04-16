@@ -122,38 +122,18 @@
         }
       ],
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true,
-              "instance": true,
-              "job": true
-            },
-            "indexByName": {
-              "exchange": 0,
-              "Value #A": 1,
-              "Value #B": 2,
-              "Value #C": 3
-            },
-            "renameByName": {
-              "exchange": "Exchange",
-              "Value #A": "mean",
-              "Value #B": "median",
-              "Value #C": "max"
-            }
+            "excludeByName": { "Time": true, "instance": true, "job": true },
+            "indexByName": { "exchange": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3 },
+            "renameByName": { "exchange": "Exchange", "Value #A": "mean", "Value #B": "median", "Value #C": "max" }
           }
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "msg/s",
-          "decimals": 1
-        },
+        "defaults": { "unit": "msg/s", "decimals": 1 },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Exchange" },
@@ -192,48 +172,29 @@
         }
       ],
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true,
-              "instance": true,
-              "job": true
-            },
-            "indexByName": {
-              "Value #A": 0,
-              "Value #B": 1,
-              "Value #C": 2
-            },
-            "renameByName": {
-              "Value #A": "mean",
-              "Value #B": "median",
-              "Value #C": "max"
-            }
+            "excludeByName": { "Time": true, "instance": true, "job": true },
+            "indexByName": { "Value #A": 0, "Value #B": 1, "Value #C": 2 },
+            "renameByName": { "Value #A": "mean", "Value #B": "median", "Value #C": "max" }
           }
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "msg/s",
-          "decimals": 1
-        }
-      }
+      "fieldConfig": { "defaults": { "unit": "msg/s", "decimals": 1 } }
     },
+
     {
       "id": 200,
-      "title": "⏱ Latency",
+      "title": "⏱ Latency (주문 매칭 체인)",
       "type": "row",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
     },
     {
       "id": 4,
-      "title": "파이프라인 처리 시간",
-      "description": "WebSocket 수신 후 Redis 저장 + RabbitMQ 발행 완료까지 소요 시간",
+      "title": "① 파이프라인 처리 시간 (ticker.latency)",
+      "description": "WebSocket 수신 후 Redis 저장 + RabbitMQ 발행 완료까지",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -247,53 +208,41 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10
-          }
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
         }
       },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     },
     {
-      "id": 6,
-      "title": "Redis 쓰기 시간",
+      "id": 20,
+      "title": "② 매칭 publish latency (match.publish.latency)",
+      "description": "시세 수신 → Redis ZSet 매칭 조회 → RabbitMQ 체결 메시지 publish ack",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(redis_write_time_seconds_sum[1m]) / rate(redis_write_time_seconds_count[1m])",
-          "legendFormat": "mean"
+          "expr": "rate(match_publish_latency_seconds_sum{acked=\"true\"}[1m]) / rate(match_publish_latency_seconds_count{acked=\"true\"}[1m])",
+          "legendFormat": "{{exchange}} (acked)"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(match_publish_latency_seconds_sum{acked=\"false\"}[1m]) / rate(match_publish_latency_seconds_count{acked=\"false\"}[1m])",
+          "legendFormat": "{{exchange}} (nack)"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10
-          }
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
         }
       },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
     },
     {
       "id": 14,
-      "title": "파이프라인 처리 시간 통계",
+      "title": "① ticker.latency 통계",
       "type": "table",
       "gridPos": { "h": 4, "w": 12, "x": 0, "y": 22 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -324,38 +273,18 @@
         }
       ],
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {
-              "exchange": 0,
-              "Value #A": 1,
-              "Value #B": 2,
-              "Value #C": 3,
-              "Value #D": 4
-            },
-            "renameByName": {
-              "exchange": "Exchange",
-              "Value #A": "mean",
-              "Value #B": "max",
-              "Value #C": "p95",
-              "Value #D": "p99"
-            }
+            "excludeByName": { "Time": true },
+            "indexByName": { "exchange": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
+            "renameByName": { "exchange": "Exchange", "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
           }
         }
       ],
       "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 4
-        },
+        "defaults": { "unit": "s", "decimals": 4 },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Exchange" },
@@ -368,81 +297,228 @@
       }
     },
     {
-      "id": 15,
-      "title": "Redis 쓰기 시간 통계",
+      "id": 21,
+      "title": "② match.publish.latency 통계 (acked=true)",
       "type": "table",
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 22 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(redis_write_time_seconds_sum[1m])) / sum(rate(redis_write_time_seconds_count[1m]))",
+          "expr": "sum by(exchange) (rate(match_publish_latency_seconds_sum{acked=\"true\"}[1m])) / sum by(exchange) (rate(match_publish_latency_seconds_count{acked=\"true\"}[1m]))",
           "format": "table",
           "instant": true
         },
         {
           "refId": "B",
-          "expr": "max(redis_write_time_seconds_max)",
+          "expr": "max by(exchange) (match_publish_latency_seconds_max{acked=\"true\"})",
           "format": "table",
           "instant": true
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(redis_write_time_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.95, sum by(exchange, le) (rate(match_publish_latency_seconds_bucket{acked=\"true\"}[1m])))",
           "format": "table",
           "instant": true
         },
         {
           "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(redis_write_time_seconds_bucket[1m])))",
+          "expr": "histogram_quantile(0.99, sum by(exchange, le) (rate(match_publish_latency_seconds_bucket{acked=\"true\"}[1m])))",
           "format": "table",
           "instant": true
         }
       ],
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
+        { "id": "merge", "options": {} },
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {
-              "Value #A": 0,
-              "Value #B": 1,
-              "Value #C": 2,
-              "Value #D": 3
-            },
-            "renameByName": {
-              "Value #A": "mean",
-              "Value #B": "max",
-              "Value #C": "p95",
-              "Value #D": "p99"
-            }
+            "excludeByName": { "Time": true, "acked": true },
+            "indexByName": { "exchange": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
+            "renameByName": { "exchange": "Exchange", "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
           }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 4 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Exchange" },
+            "properties": [
+              { "id": "unit", "value": "string" },
+              { "id": "custom.width", "value": 120 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "title": "③ 배치 DB 체결 시간 (pending.order.fill)",
+      "description": "한 배치 메시지 내 모든 주문을 DB에 체결 기록하는 데 걸린 시간",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(pending_order_fill_seconds_sum[1m]) / rate(pending_order_fill_seconds_count[1m])",
+          "legendFormat": "mean"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
+          "legendFormat": "p99"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "decimals": 4
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
         }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 23,
+      "title": "④ E2E: 매칭 시작 → 전체 주문 처리 완료 (match.batch.e2e)",
+      "description": "collector가 매칭 시작한 시점부터 api가 배치 내 모든 주문 DB 체결을 끝낸 시점까지",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(size) (rate(match_batch_e2e_seconds_sum[1m])) / sum by(size) (rate(match_batch_e2e_seconds_count[1m]))",
+          "legendFormat": "size {{size}} mean"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 24,
+      "title": "③ pending.order.fill 통계",
+      "type": "table",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pending_order_fill_seconds_sum[1m])) / sum(rate(pending_order_fill_seconds_count[1m]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "max(pending_order_fill_seconds_max)",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "Value #A": 0, "Value #B": 1, "Value #C": 2, "Value #D": 3 },
+            "renameByName": { "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
+          }
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 } }
+    },
+    {
+      "id": 25,
+      "title": "④ match.batch.e2e 통계 (size별)",
+      "type": "table",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(size) (rate(match_batch_e2e_seconds_sum[1m])) / sum by(size) (rate(match_batch_e2e_seconds_count[1m]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "max by(size) (match_batch_e2e_seconds_max)",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by(size, le) (rate(match_batch_e2e_seconds_bucket[1m])))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.99, sum by(size, le) (rate(match_batch_e2e_seconds_bucket[1m])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "size": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
+            "renameByName": { "size": "Size", "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 4 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Size" },
+            "properties": [
+              { "id": "unit", "value": "string" },
+              { "id": "custom.width", "value": 120 }
+            ]
+          }
+        ]
       }
     },
+
     {
       "id": 300,
       "title": "🚨 Errors & Reliability",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }
     },
     {
       "id": 7,
       "title": "WebSocket 재연결",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -453,26 +529,18 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": {
-            "drawStyle": "bars",
-            "lineWidth": 1,
-            "fillOpacity": 50
-          }
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 50 }
         }
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max"]
-        }
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       }
     },
     {
       "id": 8,
       "title": "메시지 파싱 실패",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -484,173 +552,59 @@
         "defaults": {
           "unit": "cps",
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 20
-          }
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20 }
         }
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max"]
-        }
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       }
     },
     {
       "id": 9,
-      "title": "RabbitMQ NACK / Candle Flush 실패",
+      "title": "RabbitMQ NACK",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
           "expr": "increase(rabbitmq_nack_count_total[5m])",
           "legendFormat": "RabbitMQ NACK"
-        },
-        {
-          "expr": "increase(candle_flush_failure_total[5m])",
-          "legendFormat": "Candle Flush 실패"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": {
-            "drawStyle": "bars",
-            "lineWidth": 1,
-            "fillOpacity": 50
-          }
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 50 }
         }
       }
     },
+
     {
       "id": 400,
       "title": "🏗 Infrastructure",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }
-    },
-    {
-      "id": 10,
-      "title": "Candle Flush 소요 시간",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(candle_flush_duration_seconds_sum[1m]) / rate(candle_flush_duration_seconds_count[1m])",
-          "legendFormat": "mean"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 16,
-      "title": "Candle Flush 통계",
-      "type": "table",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 42 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(candle_flush_duration_seconds_sum[1m])) / sum(rate(candle_flush_duration_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max(candle_flush_duration_seconds_max)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(candle_flush_duration_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(candle_flush_duration_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "indexByName": {
-              "Value #A": 0,
-              "Value #B": 1,
-              "Value #C": 2,
-              "Value #D": 3
-            },
-            "renameByName": {
-              "Value #A": "mean",
-              "Value #B": "max",
-              "Value #C": "p95",
-              "Value #D": "p99"
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 4
-        }
-      }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 }
     },
     {
       "id": 11,
       "title": "JVM Heap 사용량",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
           "expr": "jvm_memory_used_bytes{area=\"heap\"}",
-          "legendFormat": "used ({{id}})"
+          "legendFormat": "used ({{job}}/{{id}})"
         },
         {
           "expr": "jvm_memory_max_bytes{area=\"heap\"}",
-          "legendFormat": "max ({{id}})"
+          "legendFormat": "max ({{job}}/{{id}})"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
         },
         "overrides": [
           {
@@ -665,9 +619,9 @@
     },
     {
       "id": 12,
-      "title": "스레드풀 사용량",
+      "title": "스레드풀 사용량 (exchange.initializer)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 46 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -686,11 +640,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
         }
       }
     }
