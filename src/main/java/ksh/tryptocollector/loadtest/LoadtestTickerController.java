@@ -18,7 +18,7 @@ public class LoadtestTickerController {
 
     @PostMapping("/ticker")
     public ResponseEntity<Void> feedTicker(@RequestBody NormalizedTicker ticker) {
-        tickerSinkProcessor.process(ticker, System.nanoTime());
+        tickerSinkProcessor.process(ticker);
         return ResponseEntity.accepted().build();
     }
 }

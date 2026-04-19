@@ -91,12 +91,12 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
                 objectMapper.writeValueAsString(codes) + "}]";
     }
 
-    private void handleMessage(byte[] payload, long receivedAtNanos) {
+    private void handleMessage(byte[] payload) {
         try {
             byte[] decompressed = decompressIfNeeded(payload);
             UpbitTickerMessage ticker = objectMapper.readValue(decompressed, UpbitTickerMessage.class);
             marketInfoCache.find(Exchange.UPBIT, ticker.code())
-                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName()), receivedAtNanos));
+                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())));
         } catch (Exception e) {
             parseFailureCounter.increment();
             log.debug("업비트 메시지 처리 실패: {}", e.getMessage());
@@ -145,10 +145,9 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
             data.get(bytes);
             binaryBuffer.write(bytes, 0, bytes.length);
             if (last) {
-                long receivedAtNanos = System.nanoTime();
                 byte[] payload = binaryBuffer.toByteArray();
                 binaryBuffer.reset();
-                handleMessage(payload, receivedAtNanos);
+                handleMessage(payload);
             }
             webSocket.request(1);
             return null;
@@ -156,7 +155,7 @@ public class UpbitWebSocketHandler implements ExchangeTickerStream {
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            handleMessage(data.toString().getBytes(), System.nanoTime());
+            handleMessage(data.toString().getBytes());
             webSocket.request(1);
             return null;
         }

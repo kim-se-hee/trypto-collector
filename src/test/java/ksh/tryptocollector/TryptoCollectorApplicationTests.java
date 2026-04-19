@@ -1,6 +1,5 @@
 package ksh.tryptocollector;
 
-import ksh.tryptocollector.matching.CompensationScheduler;
 import ksh.tryptocollector.metadata.ExchangeInitializer;
 import ksh.tryptocollector.support.TestContainerConfiguration;
 import ksh.tryptocollector.support.TestInfluxConfig;
@@ -18,9 +17,6 @@ class TryptoCollectorApplicationTests {
 
     @MockitoBean
     ExchangeInitializer exchangeInitializer;
-
-    @MockitoBean
-    CompensationScheduler compensationScheduler;
 
     @Test
     void contextLoads() {

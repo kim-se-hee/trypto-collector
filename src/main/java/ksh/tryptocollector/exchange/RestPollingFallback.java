@@ -64,10 +64,9 @@ public class RestPollingFallback {
 
     private void pollOnce(Exchange exchange) {
         try {
-            long receivedAtNanos = System.nanoTime();
             List<NormalizedTicker> tickers = fetchTickers(exchange);
             for (NormalizedTicker ticker : tickers) {
-                tickerSinkProcessor.process(ticker, receivedAtNanos);
+                tickerSinkProcessor.process(ticker);
             }
         } catch (Exception e) {
             log.warn("{} REST 폴링 실패: {}", exchange, e.getMessage(), e);
