@@ -11,8 +11,8 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       COLLECTOR_EXCHANGE_STREAMS_ENABLED: "false"
-      SPRING_DATA_REDIS_SENTINEL_MASTER: mymaster
-      SPRING_DATA_REDIS_SENTINEL_NODES: redis-sentinel-1:26379,redis-sentinel-2:26380,redis-sentinel-3:26381
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
       SPRING_RABBITMQ_HOST: rabbitmq
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: trypto-collector-token
@@ -27,7 +27,7 @@ services:
         condition: service_healthy
       influxdb:
         condition: service_healthy
-      redis-sentinel-1:
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:9090/actuator/health"]
