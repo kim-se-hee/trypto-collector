@@ -154,12 +154,12 @@ Redisson 분산 락 기반으로 단일 액티브 인스턴스를 보장한다. 
 - **이벤트 기반 제어**: `LeadershipAcquiredEvent`/`LeadershipRevokedEvent`로 거래소 초기화, 보상 스케줄러, 워밍업을 제어한다
 - **ApplicationReadyEvent 기반 시작**: 모든 빈과 `@EventListener` 등록 완료 후 스케줄러를 시작하여, 이벤트 드롭을 방지한다
 
-### Redis Sentinel
+### Redis
 
-Redis를 1 master + 2 replica + 3 sentinel(quorum 2)로 운영한다. Lettuce(데이터 접근)와 Redisson(분산 락) 모두 동일한 Sentinel 노드를 공유한다.
+Redis를 단일 인스턴스로 운영한다. Lettuce(데이터 접근)와 Redisson(분산 락) 모두 동일한 노드를 공유한다.
 
-- **Lettuce**: Spring Data Redis의 `sentinel.master` / `sentinel.nodes` 설정으로 자동 연결
-- **Redisson**: `SentinelServersConfig`로 별도 구성, `checkSentinelsList=false`로 개발 환경 단일 Sentinel 허용
+- **Lettuce**: Spring Data Redis의 `host` / `port` 설정으로 자동 연결
+- **Redisson**: `useSingleServer()`로 `redis://host:port` 지정
 
 ### WebSocket 장애 시 REST 폴링 폴백
 
