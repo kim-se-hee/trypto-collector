@@ -12,6 +12,11 @@ scrape_configs:
     static_configs:
       - targets: ['backend:8080']
 
+  - job_name: 'trypto-engine'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['engine:8082']
+
   - job_name: 'mysqld'
     static_configs:
       - targets: ['mysqld-exporter:9104']
