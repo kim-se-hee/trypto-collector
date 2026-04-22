@@ -10,7 +10,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      COLLECTOR_EXCHANGE_STREAMS_ENABLED: "false"
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       SPRING_RABBITMQ_HOST: rabbitmq
