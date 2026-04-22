@@ -101,7 +101,3 @@ Task 간 offset 체인으로 이전 단계의 write 완료를 보장한다.
 ## 조회
 
 트레이딩 서버에서 캔들 데이터는 InfluxDB에서 직접 조회한다. 별도 캐싱 레이어를 두지 않는다.
-
-## 보상 스케줄러와의 관계
-
-`ticker_raw` 데이터는 보상 스케줄러(`CompensationScheduler`)가 놓친 주문 매칭을 복구할 때도 참조한다. `TickRawRepository`가 Flux 쿼리로 `ticker_raw`에서 매칭 가격을 조회한다.

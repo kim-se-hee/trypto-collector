@@ -10,9 +10,8 @@ spring:
     password: ${DB_PASSWORD:readonly}
   data:
     redis:
-      sentinel:
-        master: ${REDIS_SENTINEL_MASTER:mymaster}
-        nodes: ${REDIS_SENTINEL_NODES:localhost:26379,localhost:26380,localhost:26381}
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       timeout: 200ms
       connect-timeout: 500ms
   rabbitmq:
@@ -56,10 +55,7 @@ management:
   metrics:
     distribution:
       percentiles-histogram:
-        ticker.latency: true
         redis.write.time: true
-        match.decision.latency: true
-        match.publish.latency: true
 
 logging:
   level:

@@ -3,7 +3,6 @@ package ksh.tryptocollector.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.redisson.config.SentinelServersConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,21 +14,17 @@ public class RedissonConfig {
 
     private static final String REDIS_PROTOCOL = "redis://";
 
-    @Value("${spring.data.redis.sentinel.master}")
-    private String masterName;
+    @Value("${spring.data.redis.host}")
+    private String host;
 
-    @Value("${spring.data.redis.sentinel.nodes}")
-    private String sentinelNodes;
+    @Value("${spring.data.redis.port}")
+    private int port;
 
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
-        SentinelServersConfig sentinelConfig = config.useSentinelServers()
-                .setMasterName(masterName)
-                .setCheckSentinelsList(false);
-        for (String node : sentinelNodes.split(",")) {
-            sentinelConfig.addSentinelAddress(REDIS_PROTOCOL + node.trim());
-        }
+        config.useSingleServer()
+                .setAddress(REDIS_PROTOCOL + host + ":" + port);
         return Redisson.create(config);
     }
 }

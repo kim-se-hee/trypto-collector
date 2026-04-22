@@ -18,7 +18,6 @@ import ksh.tryptocollector.redis.MarketMetadataRedisRepository;
 import ksh.tryptocollector.redis.TickerRedisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -46,9 +45,6 @@ public class ExchangeInitializer {
     private final BinanceWebSocketHandler binanceWebSocketHandler;
     private final MeterRegistry meterRegistry;
 
-    @Value("${collector.exchange-streams.enabled:true}")
-    private boolean exchangeStreamsEnabled;
-
     private static final long MAX_BACKOFF_SECONDS = 60;
     private static final int CHANGE_RATE_SCALE = 8;
     private static final int THREAD_POOL_SIZE = 3;
@@ -69,29 +65,17 @@ public class ExchangeInitializer {
 
     private void initUpbit() {
         loadUpbitMetadata();
-        if (exchangeStreamsEnabled) {
-            upbitWebSocketHandler.connect();
-        } else {
-            log.info("업비트 WebSocket 연결을 건너뜁니다 (streams disabled).");
-        }
+        upbitWebSocketHandler.connect();
     }
 
     private void initBithumb() {
         loadBithumbMetadata();
-        if (exchangeStreamsEnabled) {
-            bithumbWebSocketHandler.connect();
-        } else {
-            log.info("빗썸 WebSocket 연결을 건너뜁니다 (streams disabled).");
-        }
+        bithumbWebSocketHandler.connect();
     }
 
     private void initBinance() {
         loadBinanceMetadata();
-        if (exchangeStreamsEnabled) {
-            binanceWebSocketHandler.connect();
-        } else {
-            log.info("바이낸스 WebSocket 연결을 건너뜁니다 (streams disabled).");
-        }
+        binanceWebSocketHandler.connect();
     }
 
     public void stop() {

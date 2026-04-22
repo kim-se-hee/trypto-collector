@@ -1,9 +1,8 @@
 spring:
   data:
     redis:
-      sentinel:
-        master:
-        nodes:
+      host:
+      port:
   sql:
     init:
       mode: always

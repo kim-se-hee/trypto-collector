@@ -75,12 +75,12 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
         }
     }
 
-    private void handleMessage(String payload, long receivedAtNanos) {
+    private void handleMessage(String payload) {
         try {
             BinanceTickerMessage[] tickers = objectMapper.readValue(payload, BinanceTickerMessage[].class);
             for (BinanceTickerMessage ticker : tickers) {
                 marketInfoCache.find(Exchange.BINANCE, ticker.symbol())
-                        .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName()), receivedAtNanos));
+                        .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())));
             }
         } catch (Exception e) {
             parseFailureCounter.increment();
@@ -109,10 +109,9 @@ public class BinanceWebSocketHandler implements ExchangeTickerStream {
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
             textBuffer.append(data);
             if (last) {
-                long receivedAtNanos = System.nanoTime();
                 String message = textBuffer.toString();
                 textBuffer.setLength(0);
-                handleMessage(message, receivedAtNanos);
+                handleMessage(message);
             }
             webSocket.request(1);
             return null;

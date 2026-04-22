@@ -86,11 +86,11 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
                 objectMapper.writeValueAsString(codes) + "}]";
     }
 
-    private void handleMessage(String payload, long receivedAtNanos) {
+    private void handleMessage(String payload) {
         try {
             BithumbTickerMessage ticker = objectMapper.readValue(payload, BithumbTickerMessage.class);
             marketInfoCache.find(Exchange.BITHUMB, ticker.code())
-                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName()), receivedAtNanos));
+                    .ifPresent(meta -> tickerSinkProcessor.process(ticker.toNormalized(meta.displayName())));
         } catch (Exception e) {
             parseFailureCounter.increment();
             log.debug("빗썸 메시지 처리 실패: {}", e.getMessage());
@@ -121,8 +121,7 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
             data.get(bytes);
             binaryBuffer.write(bytes, 0, bytes.length);
             if (last) {
-                long receivedAtNanos = System.nanoTime();
-                handleMessage(binaryBuffer.toString(java.nio.charset.StandardCharsets.UTF_8), receivedAtNanos);
+                handleMessage(binaryBuffer.toString(java.nio.charset.StandardCharsets.UTF_8));
                 binaryBuffer.reset();
             }
             webSocket.request(1);
@@ -133,10 +132,9 @@ public class BithumbWebSocketHandler implements ExchangeTickerStream {
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
             textBuffer.append(data);
             if (last) {
-                long receivedAtNanos = System.nanoTime();
                 String message = textBuffer.toString();
                 textBuffer.setLength(0);
-                handleMessage(message, receivedAtNanos);
+                handleMessage(message);
             }
             webSocket.request(1);
             return null;

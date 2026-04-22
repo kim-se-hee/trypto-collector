@@ -1,7 +1,7 @@
 services:
   collector:
-    build: .
-    image: kimsehee98/trypto-collector:v1
+    image: ${COLLECTOR_IMAGE:-kimsehee98/trypto-collector:v1}
+    pull_policy: always
     networks:
       - trypto-net
     ports:
@@ -10,9 +10,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      COLLECTOR_EXCHANGE_STREAMS_ENABLED: "false"
-      SPRING_DATA_REDIS_SENTINEL_MASTER: mymaster
-      SPRING_DATA_REDIS_SENTINEL_NODES: redis-sentinel-1:26379,redis-sentinel-2:26380,redis-sentinel-3:26381
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
       SPRING_RABBITMQ_HOST: rabbitmq
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: trypto-collector-token
@@ -27,7 +26,7 @@ services:
         condition: service_healthy
       influxdb:
         condition: service_healthy
-      redis-sentinel-1:
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:9090/actuator/health"]
@@ -60,6 +59,32 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    networks:
+      - trypto-net
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    networks:
+      - trypto-net
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+    restart: unless-stopped
 
 volumes:
   prometheus-data:
