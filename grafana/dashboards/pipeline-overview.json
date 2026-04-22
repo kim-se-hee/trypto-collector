@@ -184,435 +184,17 @@
       ],
       "fieldConfig": { "defaults": { "unit": "msg/s", "decimals": 1 } }
     },
-
-    {
-      "id": 200,
-      "title": "⏱ Latency (주문 매칭 체인)",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
-    },
-    {
-      "id": 4,
-      "title": "① 파이프라인 처리 시간 (ticker.latency)",
-      "description": "WebSocket 수신 후 Redis 저장 + RabbitMQ 발행 완료까지",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(ticker_latency_seconds_sum[1m]) / rate(ticker_latency_seconds_count[1m])",
-          "legendFormat": "{{exchange}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-    {
-      "id": 20,
-      "title": "② 매칭 publish latency (match.publish.latency)",
-      "description": "시세 수신 → Redis ZSet 매칭 조회 → RabbitMQ 체결 메시지 publish ack",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(match_publish_latency_seconds_sum{acked=\"true\"}[1m]) / rate(match_publish_latency_seconds_count{acked=\"true\"}[1m])",
-          "legendFormat": "{{exchange}} (acked)"
-        },
-        {
-          "refId": "B",
-          "expr": "rate(match_publish_latency_seconds_sum{acked=\"false\"}[1m]) / rate(match_publish_latency_seconds_count{acked=\"false\"}[1m])",
-          "legendFormat": "{{exchange}} (nack)"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-    {
-      "id": 14,
-      "title": "① ticker.latency 통계",
-      "type": "table",
-      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 22 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by(exchange) (rate(ticker_latency_seconds_sum[1m])) / sum by(exchange) (rate(ticker_latency_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max by(exchange) (ticker_latency_seconds_max)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(exchange, le) (rate(ticker_latency_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(exchange, le) (rate(ticker_latency_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "merge", "options": {} },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true },
-            "indexByName": { "exchange": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
-            "renameByName": { "exchange": "Exchange", "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "s", "decimals": 4 },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Exchange" },
-            "properties": [
-              { "id": "unit", "value": "string" },
-              { "id": "custom.width", "value": 120 }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 21,
-      "title": "② match.publish.latency 통계 (acked=true)",
-      "type": "table",
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 22 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by(exchange) (rate(match_publish_latency_seconds_sum{acked=\"true\"}[1m])) / sum by(exchange) (rate(match_publish_latency_seconds_count{acked=\"true\"}[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max by(exchange) (match_publish_latency_seconds_max{acked=\"true\"})",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(exchange, le) (rate(match_publish_latency_seconds_bucket{acked=\"true\"}[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(exchange, le) (rate(match_publish_latency_seconds_bucket{acked=\"true\"}[1m])))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "merge", "options": {} },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true, "acked": true },
-            "indexByName": { "exchange": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
-            "renameByName": { "exchange": "Exchange", "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "s", "decimals": 4 },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Exchange" },
-            "properties": [
-              { "id": "unit", "value": "string" },
-              { "id": "custom.width", "value": 120 }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 22,
-      "title": "③ 배치 DB 체결 시간 (pending.order.fill)",
-      "description": "한 배치 메시지 내 모든 주문을 DB에 체결 기록하는 데 걸린 시간",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(pending_order_fill_seconds_sum[1m]) / rate(pending_order_fill_seconds_count[1m])",
-          "legendFormat": "mean"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
-          "legendFormat": "p95"
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-    {
-      "id": 23,
-      "title": "④ E2E: 매칭 시작 → 전체 주문 처리 완료 (match.batch.e2e)",
-      "description": "collector가 매칭 시작한 시점부터 api가 배치 내 모든 주문 DB 체결을 끝낸 시점까지",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(match_batch_e2e_seconds_sum[1m])) / sum(rate(match_batch_e2e_seconds_count[1m]))",
-          "legendFormat": "mean"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(match_batch_e2e_seconds_bucket[1m])))",
-          "legendFormat": "p95"
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(match_batch_e2e_seconds_bucket[1m])))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-    {
-      "id": 24,
-      "title": "③ pending.order.fill 통계",
-      "type": "table",
-      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(pending_order_fill_seconds_sum[1m])) / sum(rate(pending_order_fill_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max(pending_order_fill_seconds_max)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "merge", "options": {} },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true },
-            "indexByName": { "Value #A": 0, "Value #B": 1, "Value #C": 2, "Value #D": 3 },
-            "renameByName": { "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
-          }
-        }
-      ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 } }
-    },
-    {
-      "id": 25,
-      "title": "④ match.batch.e2e 통계",
-      "type": "table",
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 32 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(match_batch_e2e_seconds_sum[1m])) / sum(rate(match_batch_e2e_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max(match_batch_e2e_seconds_max)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(match_batch_e2e_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(match_batch_e2e_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "merge", "options": {} },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true },
-            "indexByName": { "Value #A": 0, "Value #B": 1, "Value #C": 2, "Value #D": 3 },
-            "renameByName": { "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99" }
-          }
-        }
-      ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 } }
-    },
-
-    {
-      "id": 26,
-      "title": "⑤ 단건 DB 체결 시간 (pending.order.fill.item)",
-      "description": "단일 주문 1건의 DB 체결 처리 시간 (CAS + 조회 + outbox insert + commit fsync 포함). 배치 for-loop 합(pending.order.fill)과 달리 Item 1건 자체가 느린지 확인용.",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(pending_order_fill_item_seconds_sum[1m]) / rate(pending_order_fill_item_seconds_count[1m])",
-          "legendFormat": "mean"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_item_seconds_bucket[1m])))",
-          "legendFormat": "p95"
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_item_seconds_bucket[1m])))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 }
-        }
-      },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
-    },
-    {
-      "id": 27,
-      "title": "⑤ pending.order.fill.item 통계",
-      "type": "table",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(rate(pending_order_fill_item_seconds_sum[1m])) / sum(rate(pending_order_fill_item_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "B",
-          "expr": "max(pending_order_fill_item_seconds_max)",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "C",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(pending_order_fill_item_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "D",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(pending_order_fill_item_seconds_bucket[1m])))",
-          "format": "table",
-          "instant": true
-        },
-        {
-          "refId": "E",
-          "expr": "sum(rate(pending_order_fill_item_seconds_count[1m]))",
-          "format": "table",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "merge", "options": {} },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": { "Time": true },
-            "indexByName": { "Value #A": 0, "Value #B": 1, "Value #C": 2, "Value #D": 3, "Value #E": 4 },
-            "renameByName": { "Value #A": "mean", "Value #B": "max", "Value #C": "p95", "Value #D": "p99", "Value #E": "rate/s" }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": { "unit": "s", "decimals": 4 },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "rate/s" },
-            "properties": [
-              { "id": "unit", "value": "short" },
-              { "id": "decimals", "value": 1 }
-            ]
-          }
-        ]
-      }
-    },
-
     {
       "id": 300,
       "title": "🚨 Errors & Reliability",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
     },
     {
       "id": 7,
       "title": "WebSocket 재연결",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -634,7 +216,7 @@
       "id": 8,
       "title": "메시지 파싱 실패",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -657,7 +239,7 @@
       "id": 9,
       "title": "RabbitMQ NACK",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 43 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -677,13 +259,13 @@
       "id": 400,
       "title": "🏗 Infrastructure",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
     },
     {
       "id": 11,
       "title": "JVM Heap 사용량",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
@@ -715,7 +297,7 @@
       "id": 12,
       "title": "스레드풀 사용량 (exchange.initializer)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
         {
