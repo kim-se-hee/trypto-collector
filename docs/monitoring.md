@@ -1,7 +1,7 @@
 # 개요
 
 - 파이프라인이 ~2,400개 코인의 실시간 시세를 지연 없이 처리하는지 확인하려면 내부 계측이 필요하다.
-- 차트 빈 구간, 주문 매칭 누락 같은 장애가 발생해도 측정 없이는 원인을 특정할 수 없다.
+- 차트 빈 구간, engine 발행 누락 같은 장애가 발생해도 측정 없이는 원인을 특정할 수 없다.
 
 # 측정 전략
 
@@ -24,26 +24,11 @@ Micrometer + Spring Boot Actuator로 측정한다.
 
 | 메트릭 | 타입 | 태그 | 컴포넌트 | 역할 |
 |--------|------|------|----------|------|
-| `ticker.latency` | Timer | `exchange` | `TickerSinkProcessor` | 파이프라인 처리 시간 (메서드 진입 → Redis/RabbitMQ/매칭 완료) |
-| `rabbitmq.publish` | Counter | `exchange` | `TickerEventPublisher` | RabbitMQ 발행 성공 횟수 (거래소별 처리량 측정) |
+| `rabbitmq.publish` | Counter | `exchange` | `TickerEventPublisher` | `ticker.exchange` Fanout 발행 성공 횟수 (거래소별 처리량 측정) |
+| `engine.inbox.tick.publish` | Counter | `exchange` | `EngineInboxPublisher` | `engine.inbox` 큐 tick 발행 성공 횟수 (매칭 엔진으로의 유입량 측정) |
 | `ticker.parse.failure` | Counter | `exchange` | `{거래소}WebSocketHandler` | WebSocket 메시지 파싱 실패 횟수 |
 | `websocket.reconnect` | Counter | `exchange` | `{거래소}WebSocketHandler` | WebSocket 재연결 횟수 (while 루프 내부 분기) |
 | `rabbitmq.nack.count` | Counter | — | `RabbitMQConfig` | 브로커 메시지 수신 거부 횟수 (confirm 콜백) |
-
-## 직접 계측 — 미체결 주문 매칭 (4개)
-
-| 메트릭 | 타입 | 태그 | 컴포넌트 | 역할 |
-|--------|------|------|----------|------|
-| `match.publish.latency` | Timer | `exchange`, `acked` | collector `PendingOrderMatcher` | 매칭 시작 → RabbitMQ publish 완료 |
-| `match.queue.wait` | Timer | — | api `MatchedOrderEventListener` | publish → listener 수신 (브로커 큐 대기) |
-| `pending.order.fill` | Timer (p50/p95/p99) | — | api `MatchedOrderEventListener` | 한 메시지 내 모든 주문 DB 체결 처리 총 시간 |
-| `match.batch.e2e` | Timer | `size` (`1`,`2-5`,`6-20`,`21+`) | api `MatchedOrderEventListener` | 매칭 시작 → 배치 전체 체결 완료 (메인 SLO) |
-
-구간 관계:
-- `match.batch.e2e` ≈ `match.publish.latency` + `match.queue.wait` + `pending.order.fill`
-- 차감 연산으로 병목 구간(collector/broker/api) 진단 가능
-
-`matchStartedAtMs` 타임스탬프는 `MatchedOrderMessage`에 실려 collector→api로 전파된다.
 
 ## 자동 수집
 
@@ -54,16 +39,28 @@ Micrometer + Spring Boot Actuator로 측정한다.
 
 ---
 
+# 매칭 엔진 관측
+
+주문 매칭·체결·WAL·DB 쓰기 관련 메트릭은 collector가 아니라 trypto-engine이 노출한다. collector 리포의 `grafana/dashboards/engine-overview.json` 대시보드가 다음 메트릭들을 시각화한다.
+
+| 메트릭 출처 | 내용 |
+|-------------|------|
+| `engine_inbox_*` | 큐 depth, consumer rate |
+| `engine_match_*` | 매칭 처리량, per-tick 매칭 수 |
+| `engine_wal_batch_*` | WAL 배치 처리 지연 (writes + fsync / 배치) |
+| `engine_db_write_*` | 체결 결과 DB 배치 write rate/latency |
+| `engine_order_fill_*` | 단건 주문 체결 시간 |
+
+collector 측 SLO는 "발행 성공률"(`engine.inbox.tick.publish` 누적값과 tick 수신량의 비율)까지이며, 그 이후 매칭 E2E 지연은 engine 리포의 대시보드로 추적한다.
+
+---
+
 # 설계 결정
 
-## `ticker.latency`를 AOP 대신 직접 계측하는 이유
+## collector에서 E2E 매칭 레이턴시를 측정하지 않는 이유
 
-`@Timed` AOP는 어노테이션에 정적 태그만 지정할 수 있다. `exchange` 태그는 메서드 파라미터(`NormalizedTicker.exchange()`)에서 동적으로 추출해야 하므로 `MeterRegistry`로 직접 등록한다.
+매칭 로직이 trypto-engine으로 분리되면서 collector는 "발행까지"만 책임진다. "매칭 시작 → DB 체결 완료" 구간은 engine 내부에서 WAL batch, DB batch 단위로 측정하는 쪽이 인과관계가 명확하다. collector가 발행한 tick이 engine에 도달했는지는 `engine.inbox` 큐 depth로 역추적할 수 있다.
 
-## 배치 단위 Timer(`match.batch.e2e`, `pending.order.fill`)를 per-item으로 두지 않는 이유
+## `rabbitmq.publish`와 `engine.inbox.tick.publish`를 분리하는 이유
 
-한 RabbitMQ 메시지 안의 여러 주문을 for 루프로 순차 처리하기 때문에, "한 배치의 마지막 item이 끝난 시각"은 per-item metric의 max/aggregation으로 재구성할 수 없다(Prometheus는 같은 배치의 item들을 그룹핑할 수 없음). 배치 소유권을 가진 listener에서 한 번씩 기록하여 percentile이 수학적으로 올바른 단일 Timer를 만든다.
-
-## `match.batch.e2e`의 시작점으로 `matchStartedAtMs`를 쓰는 이유
-
-거래소 시세 타임스탬프(`tickerTsMs`)는 거래소 서버 시계이고 거래소→collector 네트워크 지연을 포함한다. "매칭 로직이 실제로 시작된 시각"을 SLO 기준으로 삼기 위해 collector `match()` 진입 시점을 메시지에 실어 api까지 전파한다.
+같은 WebSocket tick이 두 경로로 팬아웃되지만 소비자와 토폴로지가 다르다(Fanout Exchange vs. durable queue). 한쪽이 실패해도 다른 쪽은 정상일 수 있으므로 카운터를 분리하여 장애 구간을 식별한다.
